@@ -69,6 +69,7 @@ function render() {
 // ---------- монетки ----------
 function coinIcon() { return `<i class="coin${st().currency === 'uah' ? ' uah' : ''}"></i>`; }
 function coins(k, max = 5) {
+  if (!k) return `<span class="coins free">⭐</span>`; // звичка без монеток
   const n = fromK(k, st());
   if (st().currency === 'coins' && Number.isInteger(n) && n > 0 && n <= max) return `<span class="coins">${coinIcon().repeat(n)}</span>`;
   return `<span class="coins">${coinIcon()}<b>${num(n)}</b></span>`;
@@ -358,6 +359,7 @@ function pSettings() {
     </fieldset>
     <fieldset><legend>Три скарбнички</legend>
       <label class="switch"><input type="checkbox" name="jarsEnabled" ${s.jarsEnabled ? 'checked' : ''}><span>Ділити кожну винагороду на три скарбнички</span></label>
+      <label class="f">💕 Доплата мами й тата до «Накопичити»<select name="matchPct">${[[0, 'Без доплати'], [25, '+25% (на 4 монетки — 1)'], [50, '+50% (на 2 монетки — 1)'], [100, '+100% (скільки поклала — стільки ж)']].map(([v, l]) => `<option value="${v}" ${Number(s.matchPct) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="pct-row">${JARS.map(j => `<label class="f">${JAR_META[j].icon} ${JAR_META[j].title}, %<input name="pct_${j}" type="number" inputmode="numeric" min="0" max="100" value="${s.jarPct[j]}"></label>`).join('')}</div>
     </fieldset>
     <fieldset><legend>Серії 🔥</legend>
@@ -401,6 +403,10 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 
+function sayPrice(t) {
+  return t.price ? `${t.title}. ${money(t.price, st(), { words: true })}.` : `${t.title}. Це твоя корисна звичка — збирай серію!`;
+}
+
 function taskModal(t) {
   const s = st(), ts = taskState(t, S.data.completions);
   const streak = t.repeat === 'daily' ? currentStreak(t.id, S.data.completions) : 0;
@@ -410,6 +416,7 @@ function taskModal(t) {
     <div class="tm-icon">${esc(t.icon)}</div>
     <h2 class="tm-title">${esc(t.title)}</h2>
     <div class="tm-price">${coins(t.price, 10)}</div>
+    ${t.price ? '' : `<div class="tm-streak">Корисна звичка: збирай серію 🔥</div>`}
     ${streak > 1 ? `<div class="tm-streak">🔥 ${streak} ${plural(streak, ['день', 'дні', 'днів'])} поспіль!</div>` : ''}
     <div class="btn-row center">
       <button class="btn ghost big" data-a="say-task">🔊</button>
@@ -417,7 +424,7 @@ function taskModal(t) {
         : ts.status === 'pending' ? `<div class="tm-state">⏳ Чекаємо, поки мама чи тато перевірять</div>`
         : `<div class="tm-state">✓ Вже зроблено сьогодні. Молодець!</div>`}
     </div>`, 'task-modal');
-  speak(`${t.title}. ${money(t.price, s, { words: true })}.`);
+  speak(sayPrice(t));
 }
 
 let pinBuf = '';
@@ -451,9 +458,9 @@ function wishModal(w) {
     <div class="emoji-row">${WISH_ICONS.map(e => `<button class="emo${e === M.emoji && !M.photo ? ' on' : ''}" data-a="wish-emoji" data-e="${e}">${e}</button>`).join('')}</div>
     <label class="f">Як називається?<input id="wishTitle" value="${esc(w?.title || '')}" placeholder="Можна сказати голосом 🎤" autocomplete="off"></label>
     <div class="f">Скільки коштує?</div>
-    <div class="stepper"><button class="btn round" data-a="wish-price" data-d="-1">−</button>
+    <div class="stepper"><button class="btn round sm10" data-a="wish-price" data-d="-10">−${10 * priceStep()}</button><button class="btn round" data-a="wish-price" data-d="-1">−</button>
       <div class="step-val" id="wishPrice">${coins(toK(M.price, s), 10)}</div>
-      <button class="btn round" data-a="wish-price" data-d="1">＋</button></div>
+      <button class="btn round" data-a="wish-price" data-d="1">＋</button><button class="btn round sm10" data-a="wish-price" data-d="10">+${10 * priceStep()}</button></div>
     ${parent && s.jarsEnabled ? `<div class="f">З якої скарбнички</div>${seg('wishJar', M.jar, [['save', '💜 Накопичити'], ['spend', '🎀 Витратити']])}` : ''}
     <div class="btn-row center">
       ${w && parent ? `<button class="btn no" data-a="wish-del">🗑 Видалити</button>` : ''}
@@ -518,7 +525,7 @@ function moneyModal(kind) {
 // ---------- СВЯТКУВАННЯ ----------
 function checkCelebrate() {
   if (!S.data?.ready || !S.data.settings || isParentView() || S.device?.role !== 'child') return;
-  const earns = S.data.ledger.filter(e => e.type === 'earn' || e.type === 'bonus');
+  const earns = S.data.ledger.filter(e => e.type === 'earn' || e.type === 'bonus' || e.type === 'match');
   const maxTs = earns.reduce((m, e) => Math.max(m, e.ts || 0), 0);
   if (S.celebrated == null) { S.celebrated = maxTs; LS.set('mm.celebrated', maxTs); return; }
   const fresh = earns.filter(e => e.ts > S.celebrated);
@@ -560,7 +567,7 @@ const A = {
     speak(`${w.title || 'Моя мрія'}. Коштує ${money(w.price, s, { words: true })}. ${p.enough ? 'Вже можна купувати!' : `Залишилось ${money(p.left, s, { words: true })}.`}`);
   },
   'task-open'(el) { sound.tap(); taskModal(findT(el.dataset.id)); },
-  'say-task'() { const t = findT(M.taskId); speak(`${t.title}. ${money(t.price, st(), { words: true })}.`); },
+  'say-task'() { speak(sayPrice(findT(M.taskId))); },
   async 'task-done'() {
     const t = findT(M.taskId), today = dayKey();
     const id = t.repeat === 'daily' ? `${t.id}_${today}` : uid();
@@ -676,7 +683,7 @@ async function approveMany(list) {
   const ops = [];
   const now = Date.now();
   list.filter(Boolean).forEach((c, i) => {
-    const o = approveOps(c, d, now + i * 2);
+    const o = approveOps(c, d, now + i * 3);
     ops.push(...o);
     for (const op of o) {
       if (op.col === 'ledger') d.ledger.push({ id: op.id, ...op.data });
@@ -698,12 +705,22 @@ async function onSubmit(form) {
       childName: f.get('childName').trim(), childVoc: f.get('childVoc').trim() || vocative(f.get('childName')),
       gender: f.get('gender'), ageGroup: f.get('ageGroup'), theme: f.get('theme'),
       currency: f.get('currency'), coinValue: Math.max(0.5, Number(f.get('coinValue')) || 5),
-      jarsEnabled, jarPct: pct,
+      jarsEnabled, jarPct: pct, matchPct: Number(f.get('matchPct')) || 0,
       streak: { enabled: f.get('streakOn') === 'on', days: Math.max(2, Number(f.get('streakDays')) || 5), bonus: Math.max(0, Number(f.get('streakBonus')) || 0) },
     };
     const pin = (f.get('pin') || '').trim();
     if (pin) { if (!/^\d{4}$/.test(pin)) return toast('PIN — це 4 цифри'); patch.pinHash = await hashPin(pin, PIN_SALT); }
-    await db([{ op: 'update', col: 'meta', id: 'settings', data: patch }]);
+    if (patch.matchPct !== s.matchPct) patch.matchSince = Date.now(); // нова доплата — без перерахунку минулого
+    const ops = [{ op: 'update', col: 'meta', id: 'settings', data: patch }];
+    // зміна курсу в режимі монеток: ціни справ і мрій зберігають кількість монеток
+    if (s.currency === 'coins' && patch.currency === 'coins' && patch.coinValue !== s.coinValue) {
+      const k = patch.coinValue / s.coinValue;
+      if (!confirm(`Курс ${num(s.coinValue)} → ${num(patch.coinValue)} грн. Ціни справ і мрій залишаться в тих самих монетках (у гривнях зміняться). Монетки, що вже в скарбничках, перерахуються за новим курсом.`)) return;
+      for (const t of S.data.tasks) ops.push({ op: 'update', col: 'tasks', id: t.id, data: { price: Math.round(t.price * k) } });
+      for (const c of S.data.completions) if (c.status === 'pending') ops.push({ op: 'update', col: 'completions', id: c.id, data: { price: Math.round(c.price * k) } });
+      for (const w of S.data.wishes) if (w.status !== 'bought') ops.push({ op: 'update', col: 'wishes', id: w.id, data: { price: Math.round(w.price * k) } });
+    }
+    await db(ops);
     toast('Збережено ✓');
   }
   if (kind === 'task') {
@@ -803,7 +820,7 @@ async function obCreate() {
   const settings = {
     ...DEFAULT_SETTINGS, childName: v.childName.trim(), childVoc: (v.childVoc || '').trim() || vocative(v.childName),
     gender: v.gender, ageGroup: v.ageGroup, theme: AGE_GROUPS.find(a => a.id === v.ageGroup)?.theme || 'kitty',
-    pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(),
+    pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(), matchSince: Date.now(),
   };
   const now = Date.now();
   const ops = [{ op: 'set', col: 'meta', id: 'settings', data: settings }];

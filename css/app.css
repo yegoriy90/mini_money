@@ -403,3 +403,10 @@ legend + * { clear: both; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 .step-val .coins, .tm-price .coins { flex-wrap: wrap; justify-content: center; max-width: 230px; row-gap: 4px; }
 .stepper .btn.round { flex: none; }
+.btn.round.sm10 { width: 56px; height: 56px; font-size: 17px; }
+@media (max-width: 640px) {
+  .stepper { gap: 8px; }
+  .btn.round { width: 52px; height: 52px; font-size: 26px; }
+  .btn.round.sm10 { width: 48px; height: 48px; font-size: 15px; }
+  .step-val { font-size: 28px; }
+}

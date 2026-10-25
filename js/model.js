@@ -14,10 +14,12 @@ export const DEFAULT_SETTINGS = {
   ageGroup: '4-5',
   theme: 'kitty',
   currency: 'coins', // coins | uah
-  coinValue: 5, // грн за монетку
+  coinValue: 10, // грн за монетку
   jarsEnabled: true,
-  jarPct: { spend: 60, save: 30, give: 10 },
-  streak: { enabled: true, days: 5, bonus: 1 }, // bonus — у монетках/гривнях поточного режиму
+  jarPct: { spend: 50, save: 40, give: 10 },
+  matchPct: 50, // доплата батьків до «Накопичити», % від того, що туди поклала дитина
+  matchSince: 0, // доплата рахується лише із записів після цього часу
+  streak: { enabled: true, days: 5, bonus: 2 }, // bonus — у монетках/гривнях поточного режиму
   pinHash: '',
   mainWishId: '',
 };
@@ -79,7 +81,7 @@ export function balances(ledger) {
   for (const e of ledger) for (const j of JARS) b[j] += e.amounts?.[j] || 0;
   return b;
 }
-export function total(b) { return b.spend + b.save + b.give; }
+export function total(b) { return (b?.spend || 0) + (b?.save || 0) + (b?.give || 0); }
 
 const EARN_TYPES = new Set(['earn', 'bonus']);
 
@@ -143,15 +145,32 @@ export function currentStreak(taskId, completions, today = dayKey()) {
   return days.has(today) ? streakUntil(days, today) : streakUntil(days, addDays(today, -1));
 }
 
+// Доплата батьків: matchPct% від усього, що дитина заробила в «Накопичити» після matchSince,
+// цілими монетками (гривнями); запис містить лише ще не доплачену різницю.
+export function matchEntry(s, ledger, ref, now) {
+  if (!s.jarsEnabled || !(s.matchPct > 0)) return null;
+  const unit = unitK(s), since = s.matchSince || 0;
+  let saved = 0, matched = 0;
+  for (const e of ledger) {
+    if ((e.ts || 0) < since) continue;
+    if (EARN_TYPES.has(e.type)) saved += e.amounts?.save || 0;
+    if (e.type === 'match') matched += e.amounts?.save || 0;
+  }
+  const delta = Math.floor(saved * s.matchPct / 100 / unit) * unit - matched;
+  if (delta <= 0) return null;
+  return { ts: now, type: 'match', amounts: { save: delta }, note: 'Доплата мами й тата', icon: '💕', ref };
+}
+
 // Записи для підтвердження виконаного завдання (батч операцій сховища).
 export function approveOps(c, data, now = Date.now()) {
   const s = data.settings;
-  const amounts = splitReward(s, data.ledger, c.price);
-  const earn = { ts: now, type: 'earn', amounts, note: c.title, icon: c.icon, ref: c.id };
-  const ops = [
-    { op: 'update', col: 'completions', id: c.id, data: { status: 'approved', decidedAt: now } },
-    { op: 'set', col: 'ledger', id: 'earn_' + c.id, data: earn },
-  ];
+  const ops = [{ op: 'update', col: 'completions', id: c.id, data: { status: 'approved', decidedAt: now } }];
+  const added = [];
+  if (c.price > 0) {
+    const earn = { ts: now, type: 'earn', amounts: splitReward(s, data.ledger, c.price), note: c.title, icon: c.icon, ref: c.id };
+    ops.push({ op: 'set', col: 'ledger', id: 'earn_' + c.id, data: earn });
+    added.push(earn);
+  }
   const task = data.tasks.find(t => t.id === c.taskId);
   if (task?.repeat === 'once') ops.push({ op: 'update', col: 'tasks', id: task.id, data: { active: false } });
   if (task?.repeat === 'daily' && s.streak.enabled && s.streak.days > 1 && s.streak.bonus > 0) {
@@ -160,12 +179,16 @@ export function approveOps(c, data, now = Date.now()) {
     const streak = streakUntil(days, c.date);
     if (streak > 0 && streak % s.streak.days === 0) {
       const bonusK = toK(s.streak.bonus, s);
-      ops.push({ op: 'set', col: 'ledger', id: 'bonus_' + c.id, data: {
-        ts: now + 1, type: 'bonus', amounts: splitReward(s, [...data.ledger, earn], bonusK),
+      const bonus = {
+        ts: now + 1, type: 'bonus', amounts: splitReward(s, [...data.ledger, ...added], bonusK),
         note: `${streak} днів поспіль: ${c.title}`, icon: '🔥', ref: c.id,
-      } });
+      };
+      ops.push({ op: 'set', col: 'ledger', id: 'bonus_' + c.id, data: bonus });
+      added.push(bonus);
     }
   }
+  const match = added.length ? matchEntry(s, [...data.ledger, ...added], c.id, now + 2) : null;
+  if (match) ops.push({ op: 'set', col: 'ledger', id: 'match_' + c.id, data: match });
   return ops;
 }
 

@@ -7,11 +7,11 @@
 - `js/app.js` — UI: онбординг, дитячий екран (справи / мрії / успіхи), батьківський режим (PIN), вікна, дії (`A`), форми.
 - `js/model.js` — логіка: гроші в **копійках**, баланс = сума `ledger`; `splitReward` (розподіл по скарбничках за «недобором», без зменшень), серії, `approveOps`/`buyOps`.
 - `js/store.js` — `LocalStore` (localStorage, fid `local`) і `CloudStore` (Firestore `families/{fid}/{meta|tasks|wishes|completions|ledger}`), однаковий API `watch/batch`. `migrateToCloud`.
-- `js/library.js` — набори завдань за віком (ціни в монетках). `js/themes.js` — теми й SVG-персонажі (спрощені, власні). `js/fx.js` — голос (uk-UA), звуки WebAudio, конфеті.
+- `js/library.js` — набори завдань за віком (ціни в монетках; гігієна = 0, лише серія). Курс за замовчуванням 1 монетка = 10 грн, скарбнички 50/40/10, доплата батьків 50% до «Накопичити» (`matchEntry`, лише після `matchSince`). Машини в сім'ї немає — завдань з авто не додавати. `js/themes.js` — теми й SVG-персонажі (спрощені, власні). `js/fx.js` — голос (uk-UA), звуки WebAudio, конфеті.
 - `js/firebase-config.js` — `null` = локальний режим. `firestore.rules`, `firebase.json` (емулятор).
 - `sw.js` — офлайн, мережа першою.
 
 ## Правила
 - Репозиторій **публічний**: жодних імен, фото чи кодів сім'ї в коді. Дані — лише в localStorage/Firestore.
-- Ідемпотентні id записів: `earn_<completionId>`, `bonus_<id>`, `buy_<wishId>`, щоденна справа `<taskId>_<YYYY-MM-DD>`.
+- Ідемпотентні id записів: `earn_<completionId>`, `bonus_<id>`, `match_<id>`, `buy_<wishId>`, щоденна справа `<taskId>_<YYYY-MM-DD>`.
 - Перевірка: Playwright 1180×820 (iPad), 820×1180, 390 (телефон); без помилок у консолі, без горизонтального скролу. Хмару — на емуляторі (Firebase SDK з npm `firebase@10.12.2`, підміна gstatic через `ctx.route`).
