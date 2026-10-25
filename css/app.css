@@ -311,7 +311,7 @@ h1, h2, h3 { margin: 0; }
 .p-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .p-top small { color: var(--muted); font-weight: 800; text-transform: uppercase; font-size: 12px; letter-spacing: .5px; }
 .p-top h1 { font-size: 26px; font-weight: 900; }
-.p-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: var(--card); padding: 6px; border-radius: 20px; box-shadow: var(--shadow); position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 5; }
+.p-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; background: var(--card); padding: 6px; border-radius: 20px; box-shadow: var(--shadow); position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 5; }
 .p-tab { position: relative; display: flex; flex-direction: column; align-items: center; padding: 8px 2px; border-radius: 14px; }
 .p-tab span { font-size: 22px; }
 .p-tab small { font-weight: 800; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -443,4 +443,46 @@ legend + * { clear: both; }
   .hearts-bar { font-size: 20px; padding: 6px 10px; }
   .mv-art { width: 54px; height: 50px; }
   .btn.mv-to { font-size: 18px; }
+}
+
+/* ранок / вечір */
+.daypart { display: inline-flex; gap: 6px; background: var(--card); padding: 5px; border-radius: 18px; box-shadow: var(--shadow); margin: 0 4px 12px; }
+.daypart button { padding: 10px 16px; border-radius: 14px; font-weight: 800; font-size: 17px; color: var(--muted); }
+.daypart button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--ink); }
+
+/* мрія-пазл */
+.puzzle { position: relative; border-radius: 20px; overflow: hidden; }
+.puzzle .wish-pic { display: block; }
+.pz-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+.pz-grid i { background: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, .55)); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); border: 1.5px solid rgba(255, 255, 255, .8); transition: opacity .8s, transform .8s; }
+.pz-grid i.open { opacity: 0; transform: scale(.6); }
+.shelf .puzzle .pz-grid { display: none; }
+
+/* наліпки */
+.album { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; background: var(--card); border-radius: 22px; padding: 14px; box-shadow: var(--shadow); }
+.sticker { aspect-ratio: 1; border-radius: 18px; font-size: 36px; display: grid; place-items: center; background: var(--bg); opacity: .45; filter: grayscale(1); }
+.sticker.got { opacity: 1; filter: none; background: color-mix(in srgb, var(--accent) 12%, var(--card)); box-shadow: 0 3px 0 var(--line); transform: rotate(-4deg); }
+.sticker.got:nth-child(2n) { transform: rotate(3deg); }
+.sticker-next { font-weight: 800; color: var(--muted); font-size: 15px; min-width: 180px; }
+.cele-sticker { display: flex; flex-direction: column; align-items: center; font-weight: 900; font-size: 22px; background: rgba(255, 255, 255, .92); color: #3a2340; border-radius: 22px; padding: 8px 20px; margin-bottom: 6px; }
+.cele-sticker span { font-size: 64px; line-height: 1.1; animation: jump .6s ease-in-out infinite alternate; }
+
+/* батьки: копія, звіт */
+.copy-remind { margin: 12px 0 0; background: #fff3c4; color: #5a4700; border-radius: 16px; padding: 10px 14px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rep-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 12px; }
+.rep-nav b { font-size: 17px; text-align: center; }
+.rep-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.rep-card { background: var(--card); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 4px; }
+.rep-card b { font-size: 26px; font-weight: 900; }
+.rep-card small { color: var(--muted); font-weight: 700; line-height: 1.35; }
+.rep-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 150px; background: var(--card); border-radius: 20px; padding: 14px 12px 8px; box-shadow: var(--shadow); }
+.rep-bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
+.rep-bar i { width: 70%; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--accent), var(--accent-2)); min-height: 4px; }
+.rep-bar b { font-size: 14px; }
+.rep-bar small { color: var(--muted); font-weight: 800; font-size: 13px; }
+@media (max-width: 640px) {
+  .daypart button { padding: 8px 10px; font-size: 15px; }
+  .album { grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 10px; }
+  .sticker { font-size: 26px; border-radius: 12px; }
+  .p-tab small { font-size: 10px; }
 }

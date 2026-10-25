@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS = {
   heartsPerCoin: 5, // щоденні звички дають ❤️, стільки сердечок = 1 монетка
   heartsSince: 0, // сердечка рахуються з підтверджень після цього часу
   kidMove: true, // дитина сама перекладає монетки між скарбничками
-  streak: { enabled: true, days: 5, bonus: 2 }, // bonus — у монетках/гривнях поточного режиму
+  streak: { enabled: true, days: 5, bonus: 2 }, // bonus — сердечок за кожні days днів поспіль
   pinHash: '',
   mainWishId: '',
 };
@@ -154,8 +154,10 @@ export function isDaily(c, tasks) {
 }
 // скільки сердечок зібрано всього і скільки «в банці» до наступної монетки
 export function hearts(data) {
-  const s = data.settings, per = Math.max(1, s.heartsPerCoin || 5);
-  const n = data.completions.filter(c => c.status === 'approved' && (c.decidedAt || 0) >= (s.heartsSince || 0) && isDaily(c, data.tasks)).length;
+  const s = data.settings, per = Math.max(1, s.heartsPerCoin || 5), since = s.heartsSince || 0;
+  let n = data.completions.filter(c => c.status === 'approved' && (c.decidedAt || 0) >= since && isDaily(c, data.tasks)).length;
+  // бонусні сердечка за серії
+  for (const e of data.ledger) if (e.type === 'heartbonus' && (e.ts || 0) >= since) n += e.hearts || 0;
   return { total: n, now: n % per, per };
 }
 
@@ -180,12 +182,26 @@ export function approveOps(c, data, now = Date.now()) {
   const s = data.settings;
   const ops = [{ op: 'update', col: 'completions', id: c.id, data: { status: 'approved', decidedAt: now } }];
   const added = [];
+  const task = data.tasks.find(t => t.id === c.taskId);
   if (isDaily(c, data.tasks)) {
-    // щоденна звичка: +1 ❤️, кожне N-те сердечко перетворюється на монетку
-    const h = hearts(data), n = h.total + 1;
-    if (n % h.per === 0) {
-      const e = { ts: now, type: 'hearts', amounts: splitReward(s, data.ledger, Math.round(s.coinValue * 100)), note: `${h.per} сердечок → монетка`, icon: '❤️', ref: c.id };
-      ops.push({ op: 'set', col: 'ledger', id: `hearts_${s.heartsSince || 0}_${n / h.per}`, data: e });
+    // щоденна звичка: +1 ❤️ (+ бонусні за серію), кожні N сердечок перетворюються на монетку
+    const h = hearts(data);
+    let gain = 1;
+    if (s.streak.enabled && s.streak.days > 1 && s.streak.bonus > 0) {
+      const days = approvedDays(c.taskId, data.completions);
+      days.add(c.date);
+      const streak = streakUntil(days, c.date);
+      if (streak > 0 && streak % s.streak.days === 0) {
+        const b = Math.round(s.streak.bonus);
+        gain += b;
+        ops.push({ op: 'set', col: 'ledger', id: 'bonus_' + c.id, data: {
+          ts: now + 1, type: 'heartbonus', hearts: b, amounts: {}, note: `${streak} днів поспіль: ${c.title}`, icon: '🔥', ref: c.id,
+        } });
+      }
+    }
+    for (let k = Math.floor(h.total / h.per) + 1; k <= Math.floor((h.total + gain) / h.per); k++) {
+      const e = { ts: now + 2, type: 'hearts', amounts: splitReward(s, [...data.ledger, ...added], Math.round(s.coinValue * 100)), note: `${h.per} сердечок → монетка`, icon: '❤️', ref: c.id };
+      ops.push({ op: 'set', col: 'ledger', id: `hearts_${s.heartsSince || 0}_${k}`, data: e });
       added.push(e);
     }
   } else if (c.price > 0) {
@@ -193,25 +209,14 @@ export function approveOps(c, data, now = Date.now()) {
     ops.push({ op: 'set', col: 'ledger', id: 'earn_' + c.id, data: earn });
     added.push(earn);
   }
-  const task = data.tasks.find(t => t.id === c.taskId);
   if (task?.repeat === 'once') ops.push({ op: 'update', col: 'tasks', id: task.id, data: { active: false } });
-  if (task?.repeat === 'daily' && s.streak.enabled && s.streak.days > 1 && s.streak.bonus > 0) {
-    const days = approvedDays(c.taskId, data.completions);
-    days.add(c.date);
-    const streak = streakUntil(days, c.date);
-    if (streak > 0 && streak % s.streak.days === 0) {
-      const bonusK = toK(s.streak.bonus, s);
-      const bonus = {
-        ts: now + 1, type: 'bonus', amounts: splitReward(s, [...data.ledger, ...added], bonusK),
-        note: `${streak} днів поспіль: ${c.title}`, icon: '🔥', ref: c.id,
-      };
-      ops.push({ op: 'set', col: 'ledger', id: 'bonus_' + c.id, data: bonus });
-      added.push(bonus);
-    }
-  }
-  const match = added.length ? matchEntry(s, [...data.ledger, ...added], c.id, now + 2) : null;
+  const match = added.length ? matchEntry(s, [...data.ledger, ...added], c.id, now + 3) : null;
   if (match) ops.push({ op: 'set', col: 'ledger', id: 'match_' + c.id, data: match });
   return ops;
+}
+
+export function cashOps(jar, amountK, note, now = Date.now()) {
+  return [{ op: 'set', col: 'ledger', id: 'cash_' + now.toString(36), data: { ts: now, type: 'cash', amounts: { [jar]: -amountK }, note: note || 'Видали готівкою', icon: '💵' } }];
 }
 
 export function buyOps(w, now = Date.now()) {

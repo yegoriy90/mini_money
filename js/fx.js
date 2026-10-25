@@ -21,6 +21,26 @@ export function speak(text) {
   speechSynthesis.speak(u);
 }
 
+// Записані фрази голосу персонажа (audio/voice/<key>.mp3, список — audio/voice/index.js).
+// say(ключі, текст): грає кліпи по черзі; якщо якогось немає — читає текст синтезатором.
+import { VOICE } from '../audio/voice/index.js';
+let voiceOn = true, current = null;
+export function setVoice(on) { voiceOn = on; }
+export function say(keys, text) {
+  const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
+  if (!voiceOn || !list.length || !list.every(k => VOICE.has(k))) return speak(text);
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  current?.pause();
+  const play = i => {
+    if (i >= list.length) return;
+    const a = new Audio(new URL(`../audio/voice/${list[i]}.mp3`, import.meta.url));
+    current = a;
+    a.onended = () => { if (current === a) play(i + 1); };
+    a.play().catch(() => speak(text));
+  };
+  play(0);
+}
+
 let ctx = null;
 function ac() {
   if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ctx = new C(); }

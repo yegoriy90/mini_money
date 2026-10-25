@@ -1,11 +1,11 @@
-import { LIBRARY, AGE_GROUPS, TASK_ICONS, WISH_ICONS } from './library.js';
+import { LIBRARY, AGE_GROUPS, TASK_ICONS, WISH_ICONS, STICKERS, STICKER_EVERY } from './library.js';
 import {
   JARS, JAR_META, DEFAULT_SETTINGS, withDefaults, dayKey, addDays, unitK, toK, fromK, num, money, moneyFull,
-  balances, total, taskState, currentStreak, approveOps, buyOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
+  balances, total, taskState, currentStreak, approveOps, buyOps, cashOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
 import { openStore, cloudAvailable, createCloudFamily, cloudFamilyExists, migrateToCloud } from './store.js';
 import { THEMES, theme } from './themes.js';
-import { speak, sound, confetti } from './fx.js';
+import { speak, say, setVoice, sound, confetti } from './fx.js';
 
 const $app = document.getElementById('app');
 const $modal = document.getElementById('modal');
@@ -55,6 +55,16 @@ function onData(state) {
   if (state.settings && state.settings.heartsSince == null && !S.migratingHearts) {
     S.migratingHearts = true;
     db([{ op: 'update', col: 'meta', id: 'settings', data: { heartsSince: Date.now() } }]);
+  }
+  if (state.ready && state.settings && !S.migratedTimes) {
+    // ранок/вечір для щоденних звичок зі старої бібліотеки
+    S.migratedTimes = true;
+    const lib = Object.values(LIBRARY).flat();
+    const ops = state.tasks.filter(t => t.repeat === 'daily' && t.time === undefined).map(t => {
+      const it = lib.find(x => x.title === t.title);
+      return { op: 'update', col: 'tasks', id: t.id, data: { time: it?.time || '' } };
+    });
+    if (ops.length) db(ops);
   }
   render();
   checkCelebrate();
@@ -134,6 +144,15 @@ function mainWish() {
 function wishPic(w, cls = '') {
   return w.photo ? `<img class="wish-pic ${cls}" src="${w.photo}" alt="">` : `<div class="wish-pic emoji ${cls}">${w.emoji || '🎁'}</div>`;
 }
+// мрія-пазл: 9 шматочків, відкриваються з накопиченням (решта — розмиті)
+function puzzle(w, pct) {
+  let h = 0;
+  for (const ch of w.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const order = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  for (let i = 8; i > 0; i--) { h = (h * 1103515245 + 12345) >>> 0; const j = h % (i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+  const open = new Set(order.slice(0, pct >= 100 ? 9 : Math.floor(pct / 100 * 9)));
+  return `<div class="puzzle">${wishPic(w)}<div class="pz-grid">${order.map((_, i) => `<i class="${open.has(i) ? 'open' : ''}"></i>`).join('')}</div></div>`;
+}
 function wishProgress(w, bal) {
   const have = Math.max(0, bal[wishJar(w)]);
   const pct = Math.min(100, have / w.price * 100);
@@ -151,7 +170,7 @@ function dreamCard(bal) {
   if (!w) return `<button class="dream-card empty" data-a="wish-new"><div class="big">⭐</div><b>Додай свою мрію!</b><small>Сфотографуй іграшку, на яку збираєш</small></button>`;
   const p = wishProgress(w, bal);
   return `<button class="dream-card" data-a="kid-view" data-v="dreams">
-    ${wishPic(w)}
+    ${puzzle(w, p.pct)}
     <div class="dream-info"><small>Моя мрія</small><b>${esc(w.title || 'Мрія')}</b>
       <div class="bar"><i style="width:${p.pct}%"></i></div>
       ${wishHave(w, p)}
@@ -166,15 +185,21 @@ function kidTasks() {
   const all = S.data.tasks.filter(t => t.active !== false)
     .map(t => ({ t, ts: taskState(t, S.data.completions, today) }))
     .sort((a, b) => rank[a.ts.status] - rank[b.ts.status]);
-  const daily = all.filter(x => x.t.repeat === 'daily'), other = all.filter(x => x.t.repeat !== 'daily');
+  const part = dayPart();
+  const daily = all.filter(x => x.t.repeat === 'daily' && (part === 'all' || !x.t.time || x.t.time === part)), other = all.filter(x => x.t.repeat !== 'daily');
+  const hasParts = all.some(x => x.t.repeat === 'daily' && x.t.time);
   const dailyDone = daily.filter(x => x.ts.status === 'approved').length;
   const otherDone = other.filter(x => x.ts.status === 'approved' || x.ts.approvedToday).length;
   const grid = list => `<div class="task-grid">${list.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>`;
   return `<section class="summary">${jarsBlock(bal)}${dreamCard(bal)}</section>
-    ${daily.length ? `<div class="sec-row"><h2 class="sec">Щоденні звички <span class="pill">${dailyDone} / ${daily.length}</span></h2>${heartsBar()}</div>${grid(daily)}` : ''}
+    ${daily.length || hasParts ? `<div class="sec-row"><h2 class="sec">${{ morning: '🌅 Ранкові', evening: '🌙 Вечірні', all: 'Щоденні' }[part]} звички <span class="pill">${dailyDone} / ${daily.length}</span></h2>${heartsBar()}</div>
+      ${hasParts ? `<div class="daypart">${[['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['all', '☀️ Усі']].map(([v, l]) => `<button class="${part === v ? 'on' : ''}" data-a="daypart" data-v="${v}">${l}</button>`).join('')}</div>` : ''}
+      ${grid(daily)}` : ''}
     ${other.length ? `<h2 class="sec">Справи за монетки <span class="pill">${otherDone} / ${other.length}</span></h2>${grid(other)}` : ''}
     ${all.length ? '' : `<div class="empty-note">Мама чи тато ще не додали справ 🙂</div>`}`;
 }
+
+function dayPart() { return S.dayPart || (new Date().getHours() < 14 ? 'morning' : 'evening'); }
 
 function heartsBar() {
   const h = hearts(S.data);
@@ -209,7 +234,7 @@ function kidDreams() {
         const p = wishProgress(w, bal);
         return `<div class="wish${w.id === main?.id ? ' main' : ''}">
           <button class="star" data-a="wish-main" data-id="${w.id}" aria-label="Головна мрія">${w.id === main?.id ? '⭐' : '☆'}</button>
-          <button class="wish-body" data-a="say-wish" data-id="${w.id}">${wishPic(w)}<b>${esc(w.title || 'Мрія')}</b>
+          <button class="wish-body" data-a="say-wish" data-id="${w.id}">${puzzle(w, p.pct)}<b>${esc(w.title || 'Мрія')}</b>
           <span class="t-price">${coins(w.price, 5)}</span>
           <div class="bar"><i style="width:${p.pct}%"></i></div>${wishHave(w, p)}</button>
           ${w.status === 'requested' ? `<div class="wish-state">⏳ Чекаємо маму чи тата</div>`
@@ -236,7 +261,11 @@ function kidProgress() {
     .map(t => ({ t, n: currentStreak(t.id, S.data.completions) })).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
   const hist = [...S.data.ledger].reverse().slice(0, 12);
   const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
-  return `<h2 class="sec">Мій тиждень</h2>
+  const st_ = stickers();
+  return `<div class="sec-row"><h2 class="sec">Мої наліпки <span class="pill">${st_.count} / ${STICKERS.length}</span></h2>
+      ${st_.count < STICKERS.length ? `<div class="sticker-next">ще ${st_.left} ${plural(st_.left, ['справа', 'справи', 'справ'])} до нової <div class="mini-bar"><i style="width:${(STICKER_EVERY - st_.left) / STICKER_EVERY * 100}%"></i></div></div>` : ''}</div>
+    <div class="album">${STICKERS.map((e, i) => `<button class="sticker${i < st_.count ? ' got' : ''}" data-a="say-sticker" data-i="${i}">${i < st_.count ? e : '❔'}</button>`).join('')}</div>
+    <h2 class="sec">Мій тиждень</h2>
     <div class="week">${week.map((x, i) => `<div class="day${x.d === today ? ' today' : ''}${x.d > today ? ' future' : ''}">
       <small>${days[i]}</small><div class="stars">${x.n ? (x.n <= 4 ? '⭐'.repeat(x.n) : `⭐<b>${x.n}</b>`) : (x.d < today ? '·' : '')}</div></div>`).join('')}</div>
     <div class="stat-row">
@@ -247,12 +276,19 @@ function kidProgress() {
     </div>
     ${streaks.length ? `<h2 class="sec">Серії 🔥</h2><div class="streaks">${streaks.map(x => `<div class="streak"><span>${esc(x.t.icon)}</span><b>${x.n}</b><small>${plural(x.n, ['день', 'дні', 'днів'])} поспіль</small>
       ${s.streak.enabled ? `<div class="mini-bar"><i style="width:${(x.n % s.streak.days) / s.streak.days * 100}%"></i></div>` : ''}</div>`).join('')}</div>
-      ${s.streak.enabled ? `<p class="hint">Кожні ${s.streak.days} ${plural(s.streak.days, ['день', 'дні', 'днів'])} поспіль — бонус ${money(toK(s.streak.bonus, s), s)}!</p>` : ''}` : ''}
+      ${s.streak.enabled ? `<p class="hint">Кожні ${s.streak.days} ${plural(s.streak.days, ['день', 'дні', 'днів'])} поспіль — бонус +${s.streak.bonus} ❤️!</p>` : ''}` : ''}
     <h2 class="sec">Історія</h2>
     <div class="hist">${hist.length ? hist.map(histRow).join('') : '<div class="empty-note">Тут з\'являться твої монетки</div>'}</div>`;
 }
 
+function stickers() {
+  const n = S.data.completions.filter(c => c.status === 'approved').length;
+  const count = Math.min(STICKERS.length, Math.floor(n / STICKER_EVERY));
+  return { count, left: STICKER_EVERY - (n % STICKER_EVERY) };
+}
+
 function histRow(e) {
+  if (e.type === 'heartbonus') return `<div class="h-row"><span class="h-icon">🔥</span><span class="h-note">${esc(e.note || '')}<small>${when(e.ts)}</small></span><b class="plus">+${e.hearts}❤️</b></div>`;
   const t = total(e.amounts);
   return `<div class="h-row"><span class="h-icon">${esc(e.icon || '🪙')}</span><span class="h-note">${esc(e.note || '')}<small>${when(e.ts)}</small></span>
     <b class="${t >= 0 ? 'plus' : 'minus'}">${t >= 0 ? '+' : '−'}${num(Math.abs(fromK(t, st())))}${coinIcon()}</b></div>`;
@@ -269,8 +305,10 @@ function when(ts) {
 function renderParent() {
   const s = st();
   const pend = S.data.completions.filter(c => c.status === 'pending').length + S.data.wishes.filter(w => w.status === 'requested').length;
-  const tabs = [['approve', '✅', 'Перевірити', pend], ['tasks', '📋', 'Завдання'], ['wishes', '⭐', 'Мрії'], ['jars', '🐷', 'Гроші'], ['settings', '⚙️', 'Налаштування']];
-  const body = { approve: pApprove, tasks: pTasks, wishes: pWishes, jars: pJars, settings: pSettings }[S.ptab]();
+  const tabs = [['approve', '✅', 'Перевірити', pend], ['tasks', '📋', 'Завдання'], ['wishes', '⭐', 'Мрії'], ['jars', '🐷', 'Гроші'], ['report', '📊', 'Тиждень'], ['settings', '⚙️', 'Налаштування']];
+  const body = { approve: pApprove, tasks: pTasks, wishes: pWishes, jars: pJars, report: pReport, settings: pSettings }[S.ptab]();
+  const lastCopy = LS.get('mm.lastExport', 0) || s.createdAt || 0;
+  const needCopy = S.data.ledger.length > 0 && Date.now() - lastCopy > 7 * 864e5;
   return `<div class="parent">
     <header class="p-top">
       <div><small>Батьківський режим</small><h1>${esc(s.childName)} ${theme(s.theme).preview}</h1></div>
@@ -279,6 +317,7 @@ function renderParent() {
         : `<button class="btn" data-a="lock">🔒 Готово</button>`}
     </header>
     <nav class="p-tabs">${tabs.map(([id, ic, label, b]) => `<button class="p-tab${S.ptab === id ? ' on' : ''}" data-a="ptab" data-v="${id}"><span>${ic}</span><small>${label}</small>${b ? `<em class="badge">${b}</em>` : ''}</button>`).join('')}</nav>
+    ${needCopy ? `<div class="copy-remind">💾 Давно не зберігали копію даних <button class="btn sm" data-a="export">📤 Зберегти копію</button></div>` : ''}
     <main class="p-main">${body}</main>
   </div>`;
 }
@@ -345,16 +384,47 @@ function pJars() {
   const jars = s.jarsEnabled ? JARS : ['spend'];
   return `<div class="p-jars">${jars.map(j => `<div class="p-jar jar-${j}"><span>${JAR_META[j].icon}</span><small>${s.jarsEnabled ? JAR_META[j].title : 'Скарбничка'}</small><b>${money(bal[j], s)}</b>${s.currency === 'coins' ? `<small>${num(bal[j] / 100)} грн</small>` : ''}</div>`).join('')}</div>
     <div class="btn-row">
-      <button class="btn" data-a="money" data-v="bonus">＋ Бонус</button>
+      <button class="btn" data-a="money" data-v="cash">💵 Видати готівкою</button>
+      <button class="btn ghost" data-a="money" data-v="bonus">＋ Бонус</button>
       <button class="btn ghost" data-a="money" data-v="take">− Зняти</button>
       ${s.jarsEnabled ? `<button class="btn ghost" data-a="money" data-v="move">⇄ Перекласти</button><button class="btn ghost" data-a="money" data-v="give">💝 Подарували</button>` : ''}
     </div>
     <h3>Історія</h3>
-    <div class="list">${[...S.data.ledger].reverse().map(e => `<div class="row">
+    <div class="list">${[...S.data.ledger].reverse().map(e => e.type === 'heartbonus' ? `<div class="row"><span class="r-icon">🔥</span><span class="r-main">${esc(e.note || '')}<small>${when(e.ts)}</small></span><span class="r-meta plus">+${e.hearts} ❤️</span><span class="r-act"><button class="btn ghost sm" data-a="ledger-del" data-id="${e.id}" title="Скасувати запис">🗑</button></span></div>` : `<div class="row">
       <span class="r-icon">${esc(e.icon || '🪙')}</span><span class="r-main">${esc(e.note || '')}<small>${when(e.ts)} · ${JARS.filter(j => e.amounts?.[j]).map(j => `${JAR_META[j].icon}${e.amounts[j] > 0 ? '+' : ''}${num(fromK(e.amounts[j], s))}`).join(' ')}</small></span>
       <span class="r-meta ${total(e.amounts) >= 0 ? 'plus' : 'minus'}">${total(e.amounts) >= 0 ? '+' : '−'}${money(Math.abs(total(e.amounts)), s)}</span>
       <span class="r-act"><button class="btn ghost sm" data-a="ledger-del" data-id="${e.id}" title="Скасувати запис">🗑</button></span>
     </div>`).join('') || '<div class="empty-note">Ще порожньо</div>'}</div>`;
+}
+
+function pReport() {
+  const s = st(), today = dayKey(), off = S.repWeek || 0;
+  const mon = addDays(today, -((new Date().getDay() + 6) % 7) - 7 * off), sun = addDays(mon, 6);
+  const t0 = new Date(mon + 'T00:00').getTime(), t1 = new Date(addDays(sun, 1) + 'T00:00').getTime();
+  const done = S.data.completions.filter(c => c.status === 'approved' && c.date >= mon && c.date <= sun);
+  const daily = done.filter(c => isDaily(c, S.data.tasks));
+  const led = S.data.ledger.filter(e => e.ts >= t0 && e.ts < t1);
+  const sumT = types => led.filter(e => types.includes(e.type)).reduce((a, e) => a + total(e.amounts), 0);
+  const earned = sumT(['earn', 'bonus', 'hearts', 'match']), match = sumT(['match']);
+  const spent = -sumT(['spend', 'cash']), given = -sumT(['give']);
+  const kidMoves = led.filter(e => e.type === 'move' && e.icon === '⇄' && !e.byParent);
+  const toSave = kidMoves.reduce((a, e) => a + Math.max(0, e.amounts?.save || 0), 0);
+  const bonusHearts = led.filter(e => e.type === 'heartbonus').reduce((a, e) => a + (e.hearts || 0), 0);
+  const perDay = Array.from({ length: 7 }, (_, i) => done.filter(c => c.date === addDays(mon, i)).length);
+  const maxDay = Math.max(1, ...perDay);
+  const top = Object.entries(done.reduce((m, c) => (m[c.title] = (m[c.title] || { n: 0, icon: c.icon }), m[c.title].n++, m), {})).sort((a, b) => b[1].n - a[1].n).slice(0, 5);
+  const fmt = k => new Date(k + 'T12:00').toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  return `<div class="rep-nav"><button class="btn ghost sm" data-a="rep-week" data-d="1">←</button><b>${off === 0 ? 'Цей тиждень' : off === 1 ? 'Минулий тиждень' : ''} ${fmt(mon)} – ${fmt(sun)}</b><button class="btn ghost sm" data-a="rep-week" data-d="-1" ${off === 0 ? 'disabled' : ''}>→</button></div>
+    <div class="rep-cards">
+      <div class="rep-card"><b>${done.length}</b><small>${plural(done.length, ['справа', 'справи', 'справ'])}: ❤️ ${daily.length} звичок · 🪙 ${done.length - daily.length} за монетки</small></div>
+      <div class="rep-card"><b>${money(earned, s)}</b><small>зароблено (${num(earned / 100)} грн)${match ? ` · з них 💕 доплата ${money(match, s)}` : ''}${bonusHearts ? ` · 🔥 +${bonusHearts} ❤️ за серії` : ''}</small></div>
+      <div class="rep-card"><b>${money(spent, s)}</b><small>витрачено на мрії й готівкою${given ? ` · 💝 подаровано ${money(given, s)}` : ''}</small></div>
+      <div class="rep-card"><b>${money(toSave, s)}</b><small>${esc(s.childName)} ${isF() ? 'сама переклала' : 'сам переклав'} в «Накопичити» ${toSave ? '👏 похваліть!' : ''}</small></div>
+    </div>
+    <h3>По днях</h3>
+    <div class="rep-bars">${perDay.map((n, i) => `<div class="rep-bar"><i style="height:${n / maxDay * 100}%"></i><b>${n || ''}</b><small>${days[i]}</small></div>`).join('')}</div>
+    ${top.length ? `<h3>Найчастіше</h3><div class="list">${top.map(([t, x]) => `<div class="row"><span class="r-icon">${esc(x.icon)}</span><span class="r-main">${esc(t)}</span><span class="r-meta">×${x.n}</span></div>`).join('')}</div>` : '<div class="empty-note">Цього тижня справ ще не було</div>'}`;
 }
 
 function seg(name, value, opts) {
@@ -389,9 +459,9 @@ function pSettings() {
       <label class="switch"><input type="checkbox" name="kidMove" ${s.kidMove ? 'checked' : ''}><span>${esc(s.childName)} може сама перекладати монетки між скарбничками</span></label>
     </fieldset>
     <fieldset><legend>Серії 🔥</legend>
-      <label class="switch"><input type="checkbox" name="streakOn" ${s.streak.enabled ? 'checked' : ''}><span>Бонус за щоденні справи поспіль</span></label>
+      <label class="switch"><input type="checkbox" name="streakOn" ${s.streak.enabled ? 'checked' : ''}><span>Бонусні ❤️ за щоденні звички кілька днів поспіль</span></label>
       <div class="pct-row"><label class="f">Днів поспіль<input name="streakDays" type="number" inputmode="numeric" min="2" value="${s.streak.days}"></label>
-      <label class="f">Бонус (${s.currency === 'uah' ? 'грн' : 'монеток'})<input name="streakBonus" type="number" inputmode="decimal" min="0" step="0.5" value="${s.streak.bonus}"></label></div>
+      <label class="f">Бонус, сердечок ❤️<input name="streakBonus" type="number" inputmode="numeric" min="0" step="1" value="${s.streak.bonus}"></label></div>
     </fieldset>
     <fieldset><legend>PIN-код батьків</legend>
       <label class="f">Новий PIN (4 цифри, порожньо — не міняти)<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off"></label>
@@ -523,6 +593,7 @@ function taskEditModal(t) {
       <div class="emoji-row">${TASK_ICONS.map(e => `<button type="button" class="emo${e === M.icon ? ' on' : ''}" data-a="task-icon" data-e="${e}">${e}</button>`).join('')}</div>
       <label class="f">Назва<input name="title" value="${esc(t?.title || '')}" required placeholder="Наприклад: застелити ліжко"></label>
       <p class="hint daily-hint">Щоденні звички дають ❤️ — ${s.heartsPerCoin} сердечок = 1 монетка.</p>
+      <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['', '☀️ Будь-коли']])}</div>
       <label class="f price-field">Ціна, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="price" type="number" inputmode="decimal" min="0" step="${s.currency === 'uah' ? 1 : 0.5}" value="${t ? fromK(t.price, s) : 1}" required></label>
       <div class="f">Як часто</div>${seg('repeat', t?.repeat || 'daily', [['daily', 'Щодня'], ['any', 'Будь-коли'], ['once', 'Один раз']])}
       <div class="btn-row center">${t ? `<button type="button" class="btn no" data-a="task-del">🗑 Видалити</button>` : ''}<button class="btn big" type="submit">Зберегти</button></div>
@@ -544,7 +615,7 @@ function libraryModal(age) {
 
 function moneyModal(kind) {
   const s = st();
-  const titles = { bonus: '＋ Бонус', take: '− Зняти', move: '⇄ Перекласти', give: '💝 Подарували' };
+  const titles = { bonus: '＋ Бонус', take: '− Зняти', move: '⇄ Перекласти', give: '💝 Подарували', cash: '💵 Видати готівкою' };
   const jarOpts = (name, def) => s.jarsEnabled ? `<select name="${name}">${JARS.map(j => `<option value="${j}" ${j === def ? 'selected' : ''}>${JAR_META[j].icon} ${JAR_META[j].title}</option>`).join('')}</select>` : '';
   M = { kind };
   openModal(`<button class="x" data-a="close">✕</button><h2>${titles[kind]}</h2>
@@ -552,7 +623,8 @@ function moneyModal(kind) {
       ${kind === 'move' ? `<label class="f">Звідки${jarOpts('from', 'spend')}</label><label class="f">Куди${jarOpts('to', 'save')}</label>`
         : kind === 'give' ? '' : s.jarsEnabled ? `<label class="f">Скарбничка${jarOpts('jar', kind === 'bonus' ? 'spend' : 'spend')}</label>` : ''}
       <label class="f">Сума, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="amount" type="number" inputmode="decimal" min="0.5" step="0.5" required></label>
-      <label class="f">${kind === 'give' ? 'Кому / на що' : 'За що'}<input name="note" placeholder="${kind === 'bonus' ? 'Допомогла бабусі' : kind === 'give' ? 'Подарунок другові / притулок' : ''}"></label>
+      ${kind === 'cash' ? `<p class="hint">1 монетка = ${num(s.coinValue)} грн. Монетки спишуться, а ви дасте справжні гроші — нехай заплатить у магазині сама.</p>` : ''}
+      <label class="f">${kind === 'give' ? 'Кому / на що' : kind === 'cash' ? 'На що' : 'За що'}<input name="note" placeholder="${kind === 'bonus' ? 'Допомогла бабусі' : kind === 'give' ? 'Подарунок другові / притулок' : kind === 'cash' ? 'Кіндер, наліпки…' : ''}"></label>
       <div class="btn-row center"><button class="btn big" type="submit">Готово</button></div>
     </form>`);
 }
@@ -560,31 +632,36 @@ function moneyModal(kind) {
 // ---------- СВЯТКУВАННЯ ----------
 function checkCelebrate() {
   if (!S.data?.ready || !S.data.settings || isParentView() || S.device?.role !== 'child') return;
-  const earns = S.data.ledger.filter(e => ['earn', 'bonus', 'match', 'hearts'].includes(e.type));
+  const earns = S.data.ledger.filter(e => ['earn', 'bonus', 'match', 'hearts', 'heartbonus'].includes(e.type));
   const dailies = S.data.completions.filter(c => c.status === 'approved' && isDaily(c, S.data.tasks));
   const maxTs = Math.max(0, ...earns.map(e => e.ts || 0), ...dailies.map(c => c.decidedAt || 0));
-  if (S.celebrated == null) { S.celebrated = maxTs; LS.set('mm.celebrated', maxTs); return; }
+  const stick = stickers().count;
+  if (S.celebrated == null) { S.celebrated = maxTs; LS.set('mm.celebrated', maxTs); LS.set('mm.stickers', stick); return; }
   const fresh = earns.filter(e => e.ts > S.celebrated);
   const freshH = dailies.filter(c => (c.decidedAt || 0) > S.celebrated);
   if (!fresh.length && !freshH.length) return;
   S.celebrated = maxTs; LS.set('mm.celebrated', maxTs);
+  const seenSt = LS.get('mm.stickers', stick), newSticker = stick > seenSt ? STICKERS[stick - 1] : '';
+  LS.set('mm.stickers', stick);
   const sum = fresh.reduce((a, e) => a + total(e.amounts), 0);
-  const s = st(), th = theme(s.theme), h = hearts(S.data), n = freshH.length;
+  const s = st(), th = theme(s.theme), h = hearts(S.data);
+  const n = freshH.length + fresh.filter(e => e.type === 'heartbonus').reduce((a, e) => a + (e.hearts || 0), 0);
   const wow = isF() ? 'Молодчинка' : 'Молодець';
-  const heartsWord = plural(n, ['сердечко', 'сердечка', 'сердечок']);
-  const items = [...freshH.map(c => `❤️ ${esc(c.title)}`), ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => `${esc(e.icon)} ${esc(e.note)}`)];
+  const items = [...freshH.map(c => `❤️ ${esc(c.title)}`),
+    ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => e.type === 'heartbonus' ? `🔥 ${esc(e.note)} +${e.hearts}❤️` : `${esc(e.icon)} ${esc(e.note)}`)];
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
       <div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><div class="mascot">${th.mascots[1]}</div></div>
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
+      ${newSticker ? `<div class="cele-sticker"><span>${newSticker}</span>Нова наліпка!</div>` : ''}
       <div class="cele-list">${items.map(x => `<span>${x}</span>`).join('')}</div>
       <small>торкнись, щоб закрити</small></div>`, 'cele-modal');
     confetti(sum ? 70 : 35); sound.fanfare();
     const left = h.per - h.now;
-    speak(sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
-      : `${wow}! Плюс ${n} ${heartsWord}! Ще ${left} — і буде монетка!`);
+    say(sum ? 'cele_coins' : 'cele_hearts', (sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
+      : `${wow}! Плюс ${n} ${plural(n, ['сердечко', 'сердечка', 'сердечок'])}! Ще ${left} — і буде монетка!`) + (newSticker ? ' І нова наліпка!' : ''));
   }, 300);
 }
 
@@ -637,6 +714,9 @@ const A = {
     M.moved[M.from] -= u; M.moved[el.dataset.j] += u;
     sound.coin(); renderMove();
   },
+  daypart(el) { S.dayPart = el.dataset.v; sound.tap(); render(); },
+  'say-sticker'(el) { const i = Number(el.dataset.i), c = stickers().count; speak(i < c ? 'Твоя наліпка!' : `Ще ${stickers().left} ${plural(stickers().left, ['справа', 'справи', 'справ'])} — і буде нова наліпка!`); },
+  'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data); speak(`У тебе ${h.now} з ${h.per} сердечок. Ще ${h.per - h.now} — і буде монетка!`); },
   'kid-view'(el) { sound.tap(); S.view = el.dataset.v; render(); window.scrollTo(0, 0); },
   'say-total'() { const s = st(); speak(`У тебе ${money(total(balances(S.data.ledger)), s, { words: true })}`); sound.coin(); },
@@ -723,7 +803,7 @@ const A = {
   'lib-age'(el) { libraryModal(el.dataset.v); },
   async 'lib-add'(el) {
     const it = LIBRARY[el.dataset.age][el.dataset.i];
-    await db([{ op: 'set', col: 'tasks', id: uid(), data: { icon: it.icon, title: it.title, repeat: it.repeat, price: Math.round(it.price * st().coinValue * 100), active: true, createdAt: Date.now() } }]);
+    await db([{ op: 'set', col: 'tasks', id: uid(), data: { icon: it.icon, title: it.title, repeat: it.repeat, time: it.time || '', price: Math.round(it.price * st().coinValue * 100), active: true, createdAt: Date.now() } }]);
     el.outerHTML = '<span class="added">✓ є</span>';
   },
   money(el) { moneyModal(el.dataset.v); },
@@ -774,6 +854,7 @@ function exportData() {
   a.download = `mini-money-${dayKey()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  LS.set('mm.lastExport', Date.now());
   toast('📤 Копію збережено');
 }
 
@@ -807,7 +888,7 @@ async function approveMany(list) {
   const ops = [];
   const now = Date.now();
   list.filter(Boolean).forEach((c, i) => {
-    const o = approveOps(c, d, now + i * 3);
+    const o = approveOps(c, d, now + i * 5);
     ops.push(...o);
     for (const op of o) {
       if (op.col === 'ledger') d.ledger.push({ id: op.id, ...op.data });
@@ -850,7 +931,7 @@ async function onSubmit(form) {
     toast('Збережено ✓');
   }
   if (kind === 'task') {
-    const data = { icon: M.icon, title: f.get('title').trim(), price: toK(f.get('price'), s), repeat: f.get('repeat') };
+    const data = { icon: M.icon, title: f.get('title').trim(), price: toK(f.get('price'), s), repeat: f.get('repeat'), time: f.get('repeat') === 'daily' ? (f.get('time') || '') : '' };
     const id = M.taskId || uid();
     closeModal();
     await db([M.taskId ? { op: 'update', col: 'tasks', id, data } : { op: 'set', col: 'tasks', id, data: { ...data, active: true, createdAt: Date.now() } }]);
@@ -862,6 +943,12 @@ async function onSubmit(form) {
     const jar = f.get('jar') || 'spend';
     let e;
     if (M.kind === 'bonus') e = { type: 'adjust', amounts: { [jar]: amt }, note: note || 'Бонус від батьків', icon: '🎁' };
+    if (M.kind === 'cash') {
+      if (bal[jar] < amt) return toast('У скарбничці менше');
+      closeModal();
+      await db(cashOps(jar, amt, note ? `Готівкою: ${note}` : 'Видали готівкою'));
+      return toast(`💵 Видайте готівкою ${num(amt / 100)} грн`);
+    }
     if (M.kind === 'take') { if (bal[jar] < amt) return toast('У скарбничці менше'); e = { type: 'adjust', amounts: { [jar]: -amt }, note: note || 'Зняли', icon: '➖' }; }
     if (M.kind === 'give') { if (bal.give < amt) return toast('У скарбничці «Подарувати» менше'); e = { type: 'give', amounts: { give: -amt }, note: note || 'Подарунок', icon: '💝' }; }
     if (M.kind === 'move') {
@@ -953,7 +1040,7 @@ async function obCreate() {
   const ops = [{ op: 'set', col: 'meta', id: 'settings', data: settings }];
   items.forEach((it, i) => {
     if (!S.ob.picked[i]) return;
-    ops.push({ op: 'set', col: 'tasks', id: uid(), data: { icon: it.icon, title: it.title, repeat: it.repeat, price: it.price * coinValue * 100, active: true, createdAt: now + i } });
+    ops.push({ op: 'set', col: 'tasks', id: uid(), data: { icon: it.icon, title: it.title, repeat: it.repeat, time: it.time || '', price: it.price * coinValue * 100, active: true, createdAt: now + i } });
   });
   try {
     let fid = 'local';
