@@ -1,0 +1,16 @@
+rules_version = '2';
+// Дані сім'ї доступні лише тим, хто знає її код (10 символів) і увійшов анонімно через застосунок.
+// Список усіх сімей отримати не можна.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{fid} {
+      allow get, create, update: if request.auth != null && fid.size() == 10;
+      allow list, delete: if false;
+
+      match /{col}/{docId} {
+        allow read, write: if request.auth != null && fid.size() == 10
+          && col in ['meta', 'tasks', 'wishes', 'completions', 'ledger'];
+      }
+    }
+  }
+}

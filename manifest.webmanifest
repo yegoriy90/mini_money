@@ -1,0 +1,17 @@
+{
+  "name": "Mini Money — скарбничка",
+  "short_name": "Скарбничка",
+  "description": "Справи по дому, монетки й мрії для дітей",
+  "lang": "uk",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fff0f6",
+  "theme_color": "#ff5fa2",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

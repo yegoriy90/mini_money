@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mini Money</title>
+<meta name="description" content="Скарбничка для маленьких помічників: справи, монетки, мрії">
+<meta name="theme-color" content="#ff5fa2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Скарбничка">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="css/app.css?v=1">
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" hidden></div>
+<script>window.MM_VERSION = '1';</script>
+<script type="module" src="js/app.js?v=1"></script>
+<script>
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded || !navigator.serviceWorker.controller) return;
+    reloaded = true;
+    if (!document.querySelector('#modal:not([hidden])')) location.reload();
+  });
+}
+</script>
+</body>
+</html>
