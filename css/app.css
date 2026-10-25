@@ -410,3 +410,9 @@ legend + * { clear: both; }
   .btn.round.sm10 { width: 48px; height: 48px; font-size: 15px; }
   .step-val { font-size: 28px; }
 }
+.wish-have { display: flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: wrap; font-weight: 800; font-size: 17px; color: var(--muted); }
+.dream-info .wish-have { justify-content: flex-start; }
+.wish-have .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--jar); flex: none; }
+.wish-have b { color: var(--ink); font-size: 20px; }
+.wish-have small { width: 100%; font-size: 13px; text-transform: none; letter-spacing: 0; }
+.dream-info .wish-have small { width: auto; }

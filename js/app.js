@@ -134,7 +134,12 @@ function wishProgress(w, bal) {
   const have = Math.max(0, bal[wishJar(w)]);
   const pct = Math.min(100, have / w.price * 100);
   const left = w.price - have;
-  return { pct, left, enough: left <= 0 };
+  return { pct, left, have, enough: left <= 0 };
+}
+// «💜 3 з 90 у Накопичити» — щоб було видно, з якої скарбнички збирається мрія
+function wishHave(w, p) {
+  const s = st(), j = wishJar(w);
+  return `<div class="wish-have jar-${j}"><span class="dot"></span>${coinIcon()}<b>${num(fromK(p.have, s))}</b> з ${num(fromK(w.price, s))}${s.jarsEnabled ? `<small>у «${JAR_META[j].title}»</small>` : ''}</div>`;
 }
 
 function dreamCard(bal) {
@@ -145,6 +150,7 @@ function dreamCard(bal) {
     ${wishPic(w)}
     <div class="dream-info"><small>Моя мрія</small><b>${esc(w.title || 'Мрія')}</b>
       <div class="bar"><i style="width:${p.pct}%"></i></div>
+      ${wishHave(w, p)}
       <div class="dream-left">${p.enough ? '🎉 Вже можна купувати!' : `Ще ${coins(p.left, 3)}`}</div></div>
   </button>`;
 }
@@ -191,7 +197,7 @@ function kidDreams() {
           <button class="star" data-a="wish-main" data-id="${w.id}" aria-label="Головна мрія">${w.id === main?.id ? '⭐' : '☆'}</button>
           <button class="wish-body" data-a="say-wish" data-id="${w.id}">${wishPic(w)}<b>${esc(w.title || 'Мрія')}</b>
           <span class="t-price">${coins(w.price, 5)}</span>
-          <div class="bar"><i style="width:${p.pct}%"></i></div></button>
+          <div class="bar"><i style="width:${p.pct}%"></i></div>${wishHave(w, p)}</button>
           ${w.status === 'requested' ? `<div class="wish-state">⏳ Чекаємо маму чи тата</div>`
             : p.enough ? `<button class="btn big" data-a="wish-request" data-id="${w.id}">🛍️ Хочу купити!</button>`
             : `<div class="wish-state">Ще ${coins(p.left, 3)}</div>`}
@@ -569,7 +575,7 @@ const A = {
   },
   'say-wish'(el) {
     const w = findW(el.dataset.id), s = st(), p = wishProgress(w, balances(S.data.ledger));
-    speak(`${w.title || 'Моя мрія'}. Коштує ${money(w.price, s, { words: true })}. ${p.enough ? 'Вже можна купувати!' : `Залишилось ${money(p.left, s, { words: true })}.`}`);
+    speak(`${w.title || 'Моя мрія'}. Коштує ${money(w.price, s, { words: true })}. ${s.jarsEnabled ? `У скарбничці ${JAR_META[wishJar(w)].title} вже ${money(p.have, s, { words: true })}.` : ''} ${p.enough ? 'Вже можна купувати!' : `Залишилось ${money(p.left, s, { words: true })}.`}`);
   },
   'task-open'(el) { sound.tap(); taskModal(findT(el.dataset.id)); },
   'say-task'() { speak(sayPrice(findT(M.taskId))); },
