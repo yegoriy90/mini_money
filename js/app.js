@@ -654,7 +654,7 @@ function checkCelebrate() {
     ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => e.type === 'heartbonus' ? `🔥 ${esc(e.note)} +${e.hearts}❤️` : `${esc(e.icon)} ${esc(e.note)}`)];
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
-      ${th.celeVideo ? `<video class="cele-video" src="${th.celeVideo}" autoplay loop muted playsinline></video>`
+      ${th.celeVideo ? `<video class="cele-video" src="${th.celeVideo}" poster="${th.celeVideo.replace('.mp4', '.jpg')}" autoplay loop muted playsinline></video>`
         : `<div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><i class="cele-coin">${sum ? coinIcon() : '❤️'}</i><div class="mascot">${th.mascots[1]}</div></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>

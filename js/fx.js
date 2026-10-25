@@ -13,6 +13,7 @@ if ('speechSynthesis' in window) {
 export function speak(text) {
   if (!('speechSynthesis' in window) || !text) return;
   speechSynthesis.cancel();
+  try { player.pause(); } catch {}
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'uk-UA';
   if (voice) u.voice = voice;
@@ -24,21 +25,33 @@ export function speak(text) {
 // Записані фрази голосу персонажа (audio/voice/<key>.mp3, список — audio/voice/index.js).
 // say(ключі, текст): грає кліпи по черзі; якщо якогось немає — читає текст синтезатором.
 import { VOICE } from '../audio/voice/index.js';
-let voiceOn = true, current = null;
+let voiceOn = true;
+// iOS грає звук лише з елемента, «розблокованого» дотиком, тож тримаємо один плеєр на весь застосунок
+const player = new Audio();
+player.preload = 'auto';
+let queue = [], fallback = '';
+window.addEventListener('pointerdown', () => {
+  if (player.dataset.unlocked) return;
+  player.dataset.unlocked = '1';
+  player.muted = true;
+  player.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAABgAAAykAWlpaWlpaWlpaWlpaWlpaWnt7e3t7e3t7e3t7e3t7e3t7nJycnJycnJycnJycnJycnL29vb29vb29vb29vb29vb293t7e3t7e3t7e3t7e3t7e3t7/////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQCowAAAAAAAAMpso+sIAAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NCxKMAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NAxKQAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80LEowAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=';
+  player.play().then(() => { player.pause(); player.muted = false; }).catch(() => { player.muted = false; });
+}, true);
+player.addEventListener('ended', () => next());
+function next() {
+  const k = queue.shift();
+  if (!k) return;
+  player.src = new URL(`../audio/voice/${k}.mp3`, import.meta.url).href;
+  player.play().catch(() => { queue = []; speak(fallback); });
+}
 export function setVoice(on) { voiceOn = on; }
 export function say(keys, text) {
   const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
   if (!voiceOn || !list.length || !list.every(k => VOICE.has(k))) return speak(text);
   if ('speechSynthesis' in window) speechSynthesis.cancel();
-  current?.pause();
-  const play = i => {
-    if (i >= list.length) return;
-    const a = new Audio(new URL(`../audio/voice/${list[i]}.mp3`, import.meta.url));
-    current = a;
-    a.onended = () => { if (current === a) play(i + 1); };
-    a.play().catch(() => speak(text));
-  };
-  play(0);
+  player.pause();
+  queue = list; fallback = text;
+  next();
 }
 
 let ctx = null;
