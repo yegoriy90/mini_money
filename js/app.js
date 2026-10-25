@@ -506,6 +506,9 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 
+// записаний голос — лише жіночі форми («Молодчинка»), для хлопчика — синтезатор
+function sayF(keys, text) { return isF() ? say(keys, text) : speak(text); }
+
 function sayPrice(t) {
   if (t.repeat === 'daily') return `${t.title}. За це — сердечко! ${hearts(S.data).per} сердечок — це монетка.`;
   return t.price ? `${t.title}. ${money(t.price, st(), { words: true })}.` : `${t.title}. Це твоя корисна звичка — збирай серію!`;
@@ -593,7 +596,7 @@ function taskEditModal(t) {
       <div class="emoji-row">${TASK_ICONS.map(e => `<button type="button" class="emo${e === M.icon ? ' on' : ''}" data-a="task-icon" data-e="${e}">${e}</button>`).join('')}</div>
       <label class="f">Назва<input name="title" value="${esc(t?.title || '')}" required placeholder="Наприклад: застелити ліжко"></label>
       <p class="hint daily-hint">Щоденні звички дають ❤️ — ${s.heartsPerCoin} сердечок = 1 монетка.</p>
-      <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['', '☀️ Будь-коли']])}</div>
+      <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['', '☀️ Протягом дня']])}</div>
       <label class="f price-field">Ціна, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="price" type="number" inputmode="decimal" min="0" step="${s.currency === 'uah' ? 1 : 0.5}" value="${t ? fromK(t.price, s) : 1}" required></label>
       <div class="f">Як часто</div>${seg('repeat', t?.repeat || 'daily', [['daily', 'Щодня'], ['any', 'Будь-коли'], ['once', 'Один раз']])}
       <div class="btn-row center">${t ? `<button type="button" class="btn no" data-a="task-del">🗑 Видалити</button>` : ''}<button class="btn big" type="submit">Зберегти</button></div>
@@ -651,7 +654,8 @@ function checkCelebrate() {
     ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => e.type === 'heartbonus' ? `🔥 ${esc(e.note)} +${e.hearts}❤️` : `${esc(e.icon)} ${esc(e.note)}`)];
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
-      <div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><div class="mascot">${th.mascots[1]}</div></div>
+      ${th.celeVideo ? `<video class="cele-video" src="${th.celeVideo}" autoplay loop muted playsinline></video>`
+        : `<div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><i class="cele-coin">${sum ? coinIcon() : '❤️'}</i><div class="mascot">${th.mascots[1]}</div></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
@@ -660,7 +664,8 @@ function checkCelebrate() {
       <small>торкнись, щоб закрити</small></div>`, 'cele-modal');
     confetti(sum ? 70 : 35); sound.fanfare();
     const left = h.per - h.now;
-    say(sum ? 'cele_coins' : 'cele_hearts', (sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
+    const coinsN = fromK(sum, s);
+    sayF(sum ? [`cele_coins_${coinsN}`, newSticker && 'sticker_new'] : [`cele_hearts_${n}`, `hearts_left_${left}`, newSticker && 'sticker_new'], (sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
       : `${wow}! Плюс ${n} ${plural(n, ['сердечко', 'сердечка', 'сердечок'])}! Ще ${left} — і буде монетка!`) + (newSticker ? ' І нова наліпка!' : ''));
   }, 300);
 }
@@ -706,11 +711,11 @@ const findC = id => S.data.completions.find(c => c.id === id);
 
 const A = {
   retry() { connect(); },
-  async close() { const mv = M.kind === 'move'; if (mv) await commitMove(); closeModal(); if (mv) { sound.done(); speak('Готово!'); } checkCelebrate(); },
+  async close() { const mv = M.kind === 'move'; if (mv) await commitMove(); closeModal(); if (mv) { sound.done(); sayF('move_done', 'Готово!'); } checkCelebrate(); },
   'mv-from'(el) { M.from = el.dataset.j; sound.tap(); renderMove(); },
   'mv-to'(el) {
     const u = unitK(st()), live = moveLive();
-    if (live[M.from] < u) return speak('Тут уже порожньо');
+    if (live[M.from] < u) return sayF('empty_jar', 'Тут уже порожньо');
     M.moved[M.from] -= u; M.moved[el.dataset.j] += u;
     sound.coin(); renderMove();
   },
@@ -738,10 +743,10 @@ const A = {
     const id = t.repeat === 'daily' ? `${t.id}_${today}` : uid();
     closeModal();
     sound.done(); confetti(18);
-    speak(`Супер! Скажи мамі або татові, щоб вони перевірили.`);
+    sayF('task_done', 'Супер! Скажи мамі або татові, щоб вони перевірили.');
     await db([{ op: 'set', col: 'completions', id, data: { taskId: t.id, title: t.title, icon: t.icon, price: t.repeat === 'daily' ? 0 : t.price, daily: t.repeat === 'daily', date: today, status: 'pending', createdAt: Date.now() } }]);
   },
-  'wish-new'() { sound.tap(); wishModal(null); speak('Яка в тебе мрія? Сфотографуй її!'); },
+  'wish-new'() { sound.tap(); wishModal(null); sayF('wish_new', 'Яка в тебе мрія? Сфотографуй її!'); },
   'wish-edit'(el) { wishModal(findW(el.dataset.id)); },
   'wish-emoji'(el) {
     M.emoji = el.dataset.e; M.photo = '';
@@ -761,7 +766,7 @@ const A = {
     const ops = [M.wishId ? { op: 'update', col: 'wishes', id, data } : { op: 'set', col: 'wishes', id, data: { ...data, status: 'active', createdAt: Date.now() } }];
     if (!M.wishId && !mainWish()) ops.push({ op: 'update', col: 'meta', id: 'settings', data: { mainWishId: id } });
     closeModal();
-    if (!isParentView()) { sound.done(); speak('Мрію збережено! Збираймо монетки!'); }
+    if (!isParentView()) { sound.done(); sayF('wish_saved', 'Мрію збережено! Збираймо монетки!'); }
     await db(ops);
   },
   async 'wish-del'() {
@@ -772,7 +777,7 @@ const A = {
   async 'wish-main'(el) { sound.tap(); await db([{ op: 'update', col: 'meta', id: 'settings', data: { mainWishId: el.dataset.id } }]); },
   async 'wish-request'(el) {
     sound.done(); confetti(30);
-    speak('Ура! Попроси маму чи тата купити твою мрію!');
+    sayF('wish_request', 'Ура! Попроси маму чи тата купити твою мрію!');
     await db([{ op: 'update', col: 'wishes', id: el.dataset.id, data: { status: 'requested', requestedAt: Date.now() } }]);
   },
   async 'wish-unrequest'(el) { await db([{ op: 'update', col: 'wishes', id: el.dataset.id, data: { status: 'active' } }]); },
