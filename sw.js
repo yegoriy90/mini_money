@@ -1,7 +1,7 @@
 // Офлайн-кеш оболонки застосунку. При зміні файлів — підняти VERSION.
-const VERSION = 'mm-v9';
+const VERSION = 'mm-v10';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=9', 'js/app.js?v=9',
+  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=10', 'js/app.js?v=10',
   'js/model.js', 'js/store.js', 'js/library.js', 'js/themes.js', 'js/fx.js', 'js/firebase-config.js', 'audio/voice/index.js',
   'icons/icon.svg', 'assets/cele-kitty.mp4', 'assets/cele-kitty.jpg', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
 ];
@@ -17,7 +17,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(e.request, { cache: 'no-cache' }).then(res => { // завжди перепитувати сервер, щоб оновлення приходили одразу
       if (res.status === 200) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
       return res;
     }).catch(() => caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' }).then(r => r || caches.match('index.html')))
