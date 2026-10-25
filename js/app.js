@@ -77,7 +77,20 @@ function render() {
   if (!S.data.rawSettings) { S.device = null; LS.del('mm.device'); return renderOnboarding(); }
   document.documentElement.dataset.theme = st().theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme(st().theme).color);
+  // зберегти прокрутку каруселей між перемальовуваннями
+  const keep = {};
+  $app.querySelectorAll('[data-carousel]').forEach(c => { keep[c.dataset.carousel] = c.querySelector('.car-track').scrollLeft; });
   $app.innerHTML = (S.error ? `<div class="banner">${esc(S.error)}</div>` : '') + (isParentView() ? renderParent() : renderKid());
+  $app.querySelectorAll('[data-carousel]').forEach(c => {
+    const tr = c.querySelector('.car-track');
+    if (keep[c.dataset.carousel]) tr.scrollLeft = keep[c.dataset.carousel];
+    const edges = () => {
+      c.classList.toggle('at-start', tr.scrollLeft < 8);
+      c.classList.toggle('at-end', tr.scrollLeft + tr.clientWidth > tr.scrollWidth - 8);
+    };
+    edges();
+    tr.addEventListener('scroll', edges, { passive: true });
+  });
 }
 
 // ---------- монетки ----------
@@ -190,12 +203,16 @@ function kidTasks() {
   const hasParts = all.some(x => x.t.repeat === 'daily' && x.t.time);
   const dailyDone = daily.filter(x => x.ts.status === 'approved').length;
   const otherDone = other.filter(x => x.ts.status === 'approved' || x.ts.approvedToday).length;
-  const grid = list => `<div class="task-grid">${list.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>`;
+  // справи — каруселькою: свайп убік, стрілки для тих, хто ще не вміє свайпати
+  const grid = (list, key) => `<div class="carousel at-start" data-carousel="${key}">
+    <button class="car-arrow prev" data-a="car" data-d="-1" aria-label="Назад">‹</button>
+    <div class="car-track">${list.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>
+    <button class="car-arrow next" data-a="car" data-d="1" aria-label="Далі">›</button></div>`;
   return `<section class="summary">${jarsBlock(bal)}${dreamCard(bal)}</section>
     ${daily.length || hasParts ? `<div class="sec-row"><h2 class="sec">${{ morning: '🌅 Ранкові', evening: '🌙 Вечірні', all: 'Щоденні' }[part]} звички <span class="pill">${dailyDone} / ${daily.length}</span></h2>${heartsBar()}</div>
       ${hasParts ? `<div class="daypart">${[['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['all', '☀️ Усі']].map(([v, l]) => `<button class="${part === v ? 'on' : ''}" data-a="daypart" data-v="${v}">${l}</button>`).join('')}</div>` : ''}
-      ${grid(daily)}` : ''}
-    ${other.length ? `<h2 class="sec">Справи за монетки <span class="pill">${otherDone} / ${other.length}</span></h2>${grid(other)}` : ''}
+      ${grid(daily, 'daily')}` : ''}
+    ${other.length ? `<h2 class="sec">Справи за монетки <span class="pill">${otherDone} / ${other.length}</span></h2>${grid(other, 'other')}` : ''}
     ${all.length ? '' : `<div class="empty-note">Мама чи тато ще не додали справ 🙂</div>`}`;
 }
 
@@ -720,6 +737,11 @@ const A = {
     sound.coin(); renderMove();
   },
   daypart(el) { S.dayPart = el.dataset.v; sound.tap(); render(); },
+  car(el) {
+    const tr = el.closest('.carousel').querySelector('.car-track');
+    tr.scrollBy({ left: Number(el.dataset.d) * tr.clientWidth * 0.8, behavior: 'smooth' });
+    sound.tap();
+  },
   'say-sticker'(el) { const i = Number(el.dataset.i), c = stickers().count; speak(i < c ? 'Твоя наліпка!' : `Ще ${stickers().left} ${plural(stickers().left, ['справа', 'справи', 'справ'])} — і буде нова наліпка!`); },
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data); speak(`У тебе ${h.now} з ${h.per} сердечок. Ще ${h.per - h.now} — і буде монетка!`); },
