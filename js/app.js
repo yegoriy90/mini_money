@@ -1,7 +1,7 @@
 import { LIBRARY, AGE_GROUPS, TASK_ICONS, WISH_ICONS } from './library.js';
 import {
   JARS, JAR_META, DEFAULT_SETTINGS, withDefaults, dayKey, addDays, unitK, toK, fromK, num, money, moneyFull,
-  balances, total, taskState, currentStreak, approveOps, buyOps, randomCode, uid, hashPin, vocative, plural,
+  balances, total, taskState, currentStreak, approveOps, buyOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
 import { openStore, cloudAvailable, createCloudFamily, cloudFamilyExists, migrateToCloud } from './store.js';
 import { THEMES, theme } from './themes.js';
@@ -52,6 +52,10 @@ async function connect() {
 function onData(state) {
   S.data = { ...state, settings: state.settings ? withDefaults(state.settings) : null, rawSettings: state.settings };
   S.error = null;
+  if (state.settings && state.settings.heartsSince == null && !S.migratingHearts) {
+    S.migratingHearts = true;
+    db([{ op: 'update', col: 'meta', id: 'settings', data: { heartsSince: Date.now() } }]);
+  }
   render();
   checkCelebrate();
 }
@@ -156,17 +160,27 @@ function dreamCard(bal) {
 }
 
 function kidTasks() {
-  const s = st(), today = dayKey();
+  const today = dayKey();
   const bal = balances(S.data.ledger);
   const rank = { open: 0, pending: 1, approved: 2 };
-  const tasks = S.data.tasks.filter(t => t.active !== false)
+  const all = S.data.tasks.filter(t => t.active !== false)
     .map(t => ({ t, ts: taskState(t, S.data.completions, today) }))
     .sort((a, b) => rank[a.ts.status] - rank[b.ts.status]);
-  const done = tasks.filter(x => x.ts.status === 'approved' || x.ts.approvedToday).length;
+  const daily = all.filter(x => x.t.repeat === 'daily'), other = all.filter(x => x.t.repeat !== 'daily');
+  const dailyDone = daily.filter(x => x.ts.status === 'approved').length;
+  const otherDone = other.filter(x => x.ts.status === 'approved' || x.ts.approvedToday).length;
+  const grid = list => `<div class="task-grid">${list.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>`;
   return `<section class="summary">${jarsBlock(bal)}${dreamCard(bal)}</section>
-    <h2 class="sec">Справи на сьогодні <span class="pill">${done} / ${tasks.length}</span></h2>
-    ${tasks.length ? `<div class="task-grid">${tasks.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>`
-      : `<div class="empty-note">Мама чи тато ще не додали справ 🙂</div>`}`;
+    ${daily.length ? `<div class="sec-row"><h2 class="sec">Щоденні звички <span class="pill">${dailyDone} / ${daily.length}</span></h2>${heartsBar()}</div>${grid(daily)}` : ''}
+    ${other.length ? `<h2 class="sec">Справи за монетки <span class="pill">${otherDone} / ${other.length}</span></h2>${grid(other)}` : ''}
+    ${all.length ? '' : `<div class="empty-note">Мама чи тато ще не додали справ 🙂</div>`}`;
+}
+
+function heartsBar() {
+  const h = hearts(S.data);
+  return `<button class="hearts-bar" data-a="say-hearts" aria-label="Сердечка до монетки">
+    ${Array.from({ length: h.per }, (_, i) => `<span class="${i < h.now ? 'on' : ''}">${i < h.now ? '❤️' : '🤍'}</span>`).join('')}
+    <em>→</em>${coinIcon()}</button>`;
 }
 
 function taskCard(t, ts) {
@@ -175,7 +189,7 @@ function taskCard(t, ts) {
   return `<button class="task ${cls}" data-a="task-open" data-id="${t.id}">
     <span class="t-icon">${esc(t.icon || '⭐')}</span>
     <span class="t-title">${esc(t.title)}</span>
-    <span class="t-price">${coins(t.price)}</span>
+    <span class="t-price">${t.repeat === 'daily' ? '<span class="coins">❤️</span>' : coins(t.price)}</span>
     ${streak > 1 ? `<span class="t-streak">🔥${streak}</span>` : ''}
     ${ts.status === 'pending' || (t.repeat === 'any' && ts.pendingCount) ? `<span class="t-badge wait">⏳</span>` : ''}
     ${ts.status === 'approved' ? `<span class="t-badge ok">✓</span>` : ''}
@@ -226,6 +240,7 @@ function kidProgress() {
     <div class="week">${week.map((x, i) => `<div class="day${x.d === today ? ' today' : ''}${x.d > today ? ' future' : ''}">
       <small>${days[i]}</small><div class="stars">${x.n ? (x.n <= 4 ? '⭐'.repeat(x.n) : `⭐<b>${x.n}</b>`) : (x.d < today ? '·' : '')}</div></div>`).join('')}</div>
     <div class="stat-row">
+      <div class="stat"><b>${hearts(S.data).total} ❤️</b><small>сердечок за звички</small></div>
       <div class="stat"><b>${weekTotal}</b><small>${plural(weekTotal, ['справа', 'справи', 'справ'])} за тиждень</small></div>
       <div class="stat"><b>${coins(earned, 0)}</b><small>${isF() ? 'заробила' : 'заробив'} за весь час</small></div>
       <div class="stat"><b>${S.data.wishes.filter(w => w.status === 'bought').length}</b><small>мрій здійснено</small></div>
@@ -277,13 +292,13 @@ function pApprove() {
   const doneToday = S.data.completions.filter(c => c.status === 'approved' && c.date === today).reverse();
   if (!pend.length && !req.length) {
     return `<div class="empty-big">🎉<b>Усе перевірено</b><small>Коли ${esc(s.childName)} позначить справу, вона з'явиться тут</small></div>
-      ${doneToday.length ? `<h3>Сьогодні вже зроблено</h3><div class="list">${doneToday.map(c => `<div class="row"><span class="r-icon">${esc(c.icon)}</span><span class="r-main">${esc(c.title)}</span><span class="r-meta">${moneyFull(c.price, s)}</span></div>`).join('')}</div>` : ''}`;
+      ${doneToday.length ? `<h3>Сьогодні вже зроблено</h3><div class="list">${doneToday.map(c => `<div class="row"><span class="r-icon">${esc(c.icon)}</span><span class="r-main">${esc(c.title)}</span><span class="r-meta">${rewardText(c)}</span></div>`).join('')}</div>` : ''}`;
   }
   return `${pend.length > 1 ? `<button class="btn big wide" data-a="approve-all">✅ Підтвердити все (${pend.length})</button>` : ''}
     ${pend.length ? `<h3>Виконані справи</h3><div class="list">${pend.map(c => `<div class="row">
       <span class="r-icon">${esc(c.icon)}</span>
       <span class="r-main">${esc(c.title)}<small>${when(c.createdAt)}</small></span>
-      <span class="r-meta">${moneyFull(c.price, s)}</span>
+      <span class="r-meta">${rewardText(c)}</span>
       <span class="r-act"><button class="btn ok" data-a="approve" data-id="${c.id}">✓</button><button class="btn no" data-a="reject" data-id="${c.id}">✕</button></span>
     </div>`).join('')}</div>` : ''}
     ${req.length ? `<h3>Хоче купити</h3><div class="list">${req.map(w => {
@@ -296,6 +311,7 @@ function pApprove() {
     }).join('')}</div>` : ''}`;
 }
 
+function rewardText(c) { return isDaily(c, S.data.tasks) ? '❤️ сердечко' : moneyFull(c.price, st()); }
 const REPEAT = { daily: 'щодня', any: 'будь-коли', once: 'один раз' };
 function pTasks() {
   const s = st();
@@ -303,7 +319,7 @@ function pTasks() {
   const row = t => `<div class="row${t.active === false ? ' muted' : ''}">
     <span class="r-icon">${esc(t.icon)}</span>
     <span class="r-main">${esc(t.title)}<small>${REPEAT[t.repeat] || ''}</small></span>
-    <span class="r-meta">${moneyFull(t.price, s)}</span>
+    <span class="r-meta">${t.repeat === 'daily' ? '❤️' : moneyFull(t.price, s)}</span>
     <span class="r-act"><button class="btn ghost sm" data-a="task-edit" data-id="${t.id}">✏️</button>
     <button class="btn ghost sm" data-a="task-toggle" data-id="${t.id}">${t.active === false ? '▶️' : '⏸'}</button></span>
   </div>`;
@@ -368,6 +384,10 @@ function pSettings() {
       <label class="f">💕 Доплата мами й тата до «Накопичити»<select name="matchPct">${[[0, 'Без доплати'], [25, '+25% (на 4 монетки — 1)'], [50, '+50% (на 2 монетки — 1)'], [100, '+100% (скільки поклала — стільки ж)']].map(([v, l]) => `<option value="${v}" ${Number(s.matchPct) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="pct-row">${JARS.map(j => `<label class="f">${JAR_META[j].icon} ${JAR_META[j].title}, %<input name="pct_${j}" type="number" inputmode="numeric" min="0" max="100" value="${s.jarPct[j]}"></label>`).join('')}</div>
     </fieldset>
+    <fieldset><legend>Сердечка й перекладання</legend>
+      <label class="f">❤️ Скільки сердечок за щоденні звички = 1 монетка<input name="heartsPerCoin" type="number" inputmode="numeric" min="1" max="20" value="${s.heartsPerCoin}"></label>
+      <label class="switch"><input type="checkbox" name="kidMove" ${s.kidMove ? 'checked' : ''}><span>${esc(s.childName)} може сама перекладати монетки між скарбничками</span></label>
+    </fieldset>
     <fieldset><legend>Серії 🔥</legend>
       <label class="switch"><input type="checkbox" name="streakOn" ${s.streak.enabled ? 'checked' : ''}><span>Бонус за щоденні справи поспіль</span></label>
       <div class="pct-row"><label class="f">Днів поспіль<input name="streakDays" type="number" inputmode="numeric" min="2" value="${s.streak.days}"></label>
@@ -415,6 +435,7 @@ function toast(msg) {
 }
 
 function sayPrice(t) {
+  if (t.repeat === 'daily') return `${t.title}. За це — сердечко! ${hearts(S.data).per} сердечок — це монетка.`;
   return t.price ? `${t.title}. ${money(t.price, st(), { words: true })}.` : `${t.title}. Це твоя корисна звичка — збирай серію!`;
 }
 
@@ -426,8 +447,8 @@ function taskModal(t) {
   openModal(`<button class="x" data-a="close">✕</button>
     <div class="tm-icon">${esc(t.icon)}</div>
     <h2 class="tm-title">${esc(t.title)}</h2>
-    <div class="tm-price">${coins(t.price, 10)}</div>
-    ${t.price ? '' : `<div class="tm-streak">Корисна звичка: збирай серію 🔥</div>`}
+    <div class="tm-price">${t.repeat === 'daily' ? '❤️' : coins(t.price, 10)}</div>
+    ${t.repeat === 'daily' ? `<div class="tm-streak">${hearts(S.data).per} сердечок = 1 монетка</div>` : t.price ? '' : `<div class="tm-streak">Корисна звичка: збирай серію 🔥</div>`}
     ${streak > 1 ? `<div class="tm-streak">🔥 ${streak} ${plural(streak, ['день', 'дні', 'днів'])} поспіль!</div>` : ''}
     <div class="btn-row center">
       <button class="btn ghost big" data-a="say-task">🔊</button>
@@ -496,10 +517,11 @@ function taskEditModal(t) {
   const s = st();
   M = { taskId: t?.id || null, icon: t?.icon || '⭐' };
   openModal(`<button class="x" data-a="close">✕</button><h2>${t ? 'Завдання' : 'Нове завдання'}</h2>
-    <form data-form="task">
+    <form data-form="task" class="task-form">
       <div class="emoji-row">${TASK_ICONS.map(e => `<button type="button" class="emo${e === M.icon ? ' on' : ''}" data-a="task-icon" data-e="${e}">${e}</button>`).join('')}</div>
       <label class="f">Назва<input name="title" value="${esc(t?.title || '')}" required placeholder="Наприклад: застелити ліжко"></label>
-      <label class="f">Ціна, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="price" type="number" inputmode="decimal" min="0" step="${s.currency === 'uah' ? 1 : 0.5}" value="${t ? fromK(t.price, s) : 1}" required></label>
+      <p class="hint daily-hint">Щоденні звички дають ❤️ — ${s.heartsPerCoin} сердечок = 1 монетка.</p>
+      <label class="f price-field">Ціна, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="price" type="number" inputmode="decimal" min="0" step="${s.currency === 'uah' ? 1 : 0.5}" value="${t ? fromK(t.price, s) : 1}" required></label>
       <div class="f">Як часто</div>${seg('repeat', t?.repeat || 'daily', [['daily', 'Щодня'], ['any', 'Будь-коли'], ['once', 'Один раз']])}
       <div class="btn-row center">${t ? `<button type="button" class="btn no" data-a="task-del">🗑 Видалити</button>` : ''}<button class="btn big" type="submit">Зберегти</button></div>
     </form>`);
@@ -513,7 +535,7 @@ function libraryModal(age) {
     <div class="seg">${AGE_GROUPS.map(a => `<label><input type="radio" name="libAge" ${a.id === age ? 'checked' : ''} data-a="lib-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>
     <div class="list">${LIBRARY[age].map((it, i) => `<div class="row">
       <span class="r-icon">${it.icon}</span><span class="r-main">${esc(it.title)}<small>${REPEAT[it.repeat]}</small></span>
-      <span class="r-meta">${moneyFull(it.price * s.coinValue * 100, s)}</span>
+      <span class="r-meta">${it.repeat === 'daily' ? '❤️' : moneyFull(it.price * s.coinValue * 100, s)}</span>
       <span class="r-act">${have.has(it.title) ? '<span class="added">✓ є</span>' : `<button class="btn sm" data-a="lib-add" data-age="${age}" data-i="${i}">＋</button>`}</span>
     </div>`).join('')}</div>`);
 }
@@ -536,24 +558,65 @@ function moneyModal(kind) {
 // ---------- СВЯТКУВАННЯ ----------
 function checkCelebrate() {
   if (!S.data?.ready || !S.data.settings || isParentView() || S.device?.role !== 'child') return;
-  const earns = S.data.ledger.filter(e => e.type === 'earn' || e.type === 'bonus' || e.type === 'match');
-  const maxTs = earns.reduce((m, e) => Math.max(m, e.ts || 0), 0);
+  const earns = S.data.ledger.filter(e => ['earn', 'bonus', 'match', 'hearts'].includes(e.type));
+  const dailies = S.data.completions.filter(c => c.status === 'approved' && isDaily(c, S.data.tasks));
+  const maxTs = Math.max(0, ...earns.map(e => e.ts || 0), ...dailies.map(c => c.decidedAt || 0));
   if (S.celebrated == null) { S.celebrated = maxTs; LS.set('mm.celebrated', maxTs); return; }
   const fresh = earns.filter(e => e.ts > S.celebrated);
-  if (!fresh.length) return;
+  const freshH = dailies.filter(c => (c.decidedAt || 0) > S.celebrated);
+  if (!fresh.length && !freshH.length) return;
   S.celebrated = maxTs; LS.set('mm.celebrated', maxTs);
   const sum = fresh.reduce((a, e) => a + total(e.amounts), 0);
-  const s = st(), th = theme(s.theme);
+  const s = st(), th = theme(s.theme), h = hearts(S.data), n = freshH.length;
+  const wow = isF() ? 'Молодчинка' : 'Молодець';
+  const heartsWord = plural(n, ['сердечко', 'сердечка', 'сердечок']);
+  const items = [...freshH.map(c => `❤️ ${esc(c.title)}`), ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => `${esc(e.icon)} ${esc(e.note)}`)];
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
       <div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><div class="mascot">${th.mascots[1]}</div></div>
-      <div class="cele-amt">+${num(fromK(sum, s))} ${coinIcon()}</div>
-      <div class="cele-txt">${isF() ? 'Молодчинка' : 'Молодець'}!</div>
-      <div class="cele-list">${fresh.map(e => `<span>${esc(e.icon)} ${esc(e.note)}</span>`).join('')}</div>
+      <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
+      <div class="cele-txt">${wow}!</div>
+      ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
+      <div class="cele-list">${items.map(x => `<span>${x}</span>`).join('')}</div>
       <small>торкнись, щоб закрити</small></div>`, 'cele-modal');
-    confetti(70); sound.fanfare();
-    speak(`Ура! ${isF() ? 'Молодчинка' : 'Молодець'}! Плюс ${money(sum, s, { words: true })}!`);
+    confetti(sum ? 70 : 35); sound.fanfare();
+    const left = h.per - h.now;
+    speak(sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
+      : `${wow}! Плюс ${n} ${heartsWord}! Ще ${left} — і буде монетка!`);
   }, 300);
+}
+
+// ---------- ПЕРЕКЛАДАННЯ (дитина сама) ----------
+function moveModal(from) {
+  M = { kind: 'move', from, moved: { spend: 0, save: 0, give: 0 } };
+  openModal('', 'move-modal');
+  renderMove();
+  const s = st();
+  speak(`${JAR_META[from].title}: ${money(balances(S.data.ledger)[from], s, { words: true })}. Куди перекласти?`);
+}
+function moveLive() {
+  const b = balances(S.data.ledger);
+  return Object.fromEntries(JARS.map(j => [j, b[j] + M.moved[j]]));
+}
+function renderMove() {
+  const s = st(), th = theme(s.theme), live = moveLive();
+  $modal.querySelector('.modal-card').innerHTML = `<button class="x" data-a="close">✕</button>
+    <h2>Перекласти монетки</h2>
+    <div class="mv-jars">${JARS.map(j => `<button class="mv-jar jar-${j}${j === M.from ? ' on' : ''}" data-a="mv-from" data-j="${j}">
+      <div class="mv-art">${th.jarArt[j]}</div><b>${coinIcon()} ${num(fromK(live[j], s))}</b><small>${JAR_META[j].title}</small></button>`).join('')}</div>
+    <p class="hint center">Беремо з «${JAR_META[M.from].title}» — тисни, куди покласти:</p>
+    <div class="mv-targets">${JARS.filter(j => j !== M.from).map(j => `<button class="btn big mv-to jar-${j}" data-a="mv-to" data-j="${j}" ${live[M.from] < unitK(s) ? 'disabled' : ''}>
+      ${coinIcon()} → ${JAR_META[j].icon} ${JAR_META[j].title}</button>`).join('')}</div>
+    <div class="btn-row center"><button class="btn big ghost" data-a="close">✓ Готово</button></div>`;
+}
+async function commitMove() {
+  if (M.kind !== 'move') return;
+  const moved = M.moved;
+  M = {};
+  const amounts = Object.fromEntries(JARS.filter(j => moved[j]).map(j => [j, moved[j]]));
+  if (!Object.keys(amounts).length) return;
+  const from = JARS.filter(j => moved[j] < 0).map(j => JAR_META[j].icon).join(''), to = JARS.filter(j => moved[j] > 0).map(j => JAR_META[j].icon).join('');
+  await db([{ op: 'set', col: 'ledger', id: uid(), data: { ts: Date.now(), type: 'move', amounts, note: `${st().childName} ${isF() ? 'переклала' : 'переклав'} ${from} → ${to}`, icon: '⇄' } }]);
 }
 
 // ---------- ДІЇ ----------
@@ -564,14 +627,23 @@ const findC = id => S.data.completions.find(c => c.id === id);
 
 const A = {
   retry() { connect(); },
-  close() { closeModal(); checkCelebrate(); },
+  async close() { const mv = M.kind === 'move'; if (mv) await commitMove(); closeModal(); if (mv) { sound.done(); speak('Готово!'); } checkCelebrate(); },
+  'mv-from'(el) { M.from = el.dataset.j; sound.tap(); renderMove(); },
+  'mv-to'(el) {
+    const u = unitK(st()), live = moveLive();
+    if (live[M.from] < u) return speak('Тут уже порожньо');
+    M.moved[M.from] -= u; M.moved[el.dataset.j] += u;
+    sound.coin(); renderMove();
+  },
+  'say-hearts'() { const h = hearts(S.data); speak(`У тебе ${h.now} з ${h.per} сердечок. Ще ${h.per - h.now} — і буде монетка!`); },
   'kid-view'(el) { sound.tap(); S.view = el.dataset.v; render(); window.scrollTo(0, 0); },
   'say-total'() { const s = st(); speak(`У тебе ${money(total(balances(S.data.ledger)), s, { words: true })}`); sound.coin(); },
   'say-jar'(el) {
     const s = st(), j = el.dataset.j, b = balances(S.data.ledger)[j];
     const what = { spend: 'Це на те, що хочеш купити скоро.', save: 'Це на велику мрію.', give: 'Це щоб зробити подарунок або допомогти комусь.' }[j];
-    speak(s.jarsEnabled ? `${JAR_META[j].title}: ${money(b, s, { words: true })}. ${what}` : `У скарбничці ${money(b, s, { words: true })}`);
     sound.coin();
+    if (s.jarsEnabled && s.kidMove && !isParentView()) return moveModal(j);
+    speak(s.jarsEnabled ? `${JAR_META[j].title}: ${money(b, s, { words: true })}. ${what}` : `У скарбничці ${money(b, s, { words: true })}`);
   },
   'say-wish'(el) {
     const w = findW(el.dataset.id), s = st(), p = wishProgress(w, balances(S.data.ledger));
@@ -585,7 +657,7 @@ const A = {
     closeModal();
     sound.done(); confetti(18);
     speak(`Супер! Скажи мамі або татові, щоб вони перевірили.`);
-    await db([{ op: 'set', col: 'completions', id, data: { taskId: t.id, title: t.title, icon: t.icon, price: t.price, date: today, status: 'pending', createdAt: Date.now() } }]);
+    await db([{ op: 'set', col: 'completions', id, data: { taskId: t.id, title: t.title, icon: t.icon, price: t.repeat === 'daily' ? 0 : t.price, daily: t.repeat === 'daily', date: today, status: 'pending', createdAt: Date.now() } }]);
   },
   'wish-new'() { sound.tap(); wishModal(null); speak('Яка в тебе мрія? Сфотографуй її!'); },
   'wish-edit'(el) { wishModal(findW(el.dataset.id)); },
@@ -750,11 +822,13 @@ async function onSubmit(form) {
       gender: f.get('gender'), ageGroup: f.get('ageGroup'), theme: f.get('theme'),
       currency: f.get('currency'), coinValue: Math.max(0.5, Number(f.get('coinValue')) || 5),
       jarsEnabled, jarPct: pct, matchPct: Number(f.get('matchPct')) || 0,
+      heartsPerCoin: Math.min(20, Math.max(1, Math.round(Number(f.get('heartsPerCoin')) || 5))), kidMove: f.get('kidMove') === 'on',
       streak: { enabled: f.get('streakOn') === 'on', days: Math.max(2, Number(f.get('streakDays')) || 5), bonus: Math.max(0, Number(f.get('streakBonus')) || 0) },
     };
     const pin = (f.get('pin') || '').trim();
     if (pin) { if (!/^\d{4}$/.test(pin)) return toast('PIN — це 4 цифри'); patch.pinHash = await hashPin(pin, PIN_SALT); }
     if (patch.matchPct !== s.matchPct) patch.matchSince = Date.now(); // нова доплата — без перерахунку минулого
+    if (patch.heartsPerCoin !== s.heartsPerCoin) patch.heartsSince = Date.now(); // новий курс сердечок — рахунок з нуля
     const ops = [{ op: 'update', col: 'meta', id: 'settings', data: patch }];
     // зміна курсу в режимі монеток: ціни справ і мрій зберігають кількість монеток
     if (s.currency === 'coins' && patch.currency === 'coins' && patch.coinValue !== s.coinValue) {
@@ -843,7 +917,7 @@ function renderOnboarding() {
     const items = LIBRARY[o.form.ageGroup];
     $app.innerHTML = `<div class="center-screen ob"><div class="card pad ob-form wide">
       <h2>Перші справи</h2><p class="hint">Оберіть кілька — для початку краще 4–6. Ціни й усе інше можна змінити потім.</p>
-      <div class="lib-grid">${items.map((it, i) => `<button class="lib-item${o.picked[i] ? ' on' : ''}" data-a="ob-lib-toggle" data-i="${i}"><span>${it.icon}</span><b>${esc(it.title)}</b><small>${it.price} 🪙 · ${REPEAT[it.repeat]}</small></button>`).join('')}</div>
+      <div class="lib-grid">${items.map((it, i) => `<button class="lib-item${o.picked[i] ? ' on' : ''}" data-a="ob-lib-toggle" data-i="${i}"><span>${it.icon}</span><b>${esc(it.title)}</b><small>${it.repeat === 'daily' ? '❤️' : `${it.price} 🪙`} · ${REPEAT[it.repeat]}</small></button>`).join('')}</div>
       <div class="btn-row"><button class="btn ghost" data-a="ob-step" data-v="create">Назад</button><button class="btn big" data-a="ob-create">🎀 Готово!</button></div>
     </div></div>`;
     return;
@@ -865,7 +939,7 @@ async function obCreate() {
   const settings = {
     ...DEFAULT_SETTINGS, childName: v.childName.trim(), childVoc: (v.childVoc || '').trim() || vocative(v.childName),
     gender: v.gender, ageGroup: v.ageGroup, theme: AGE_GROUPS.find(a => a.id === v.ageGroup)?.theme || 'kitty',
-    pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(), matchSince: Date.now(),
+    pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(), matchSince: Date.now(), heartsSince: Date.now(),
   };
   const now = Date.now();
   const ops = [{ op: 'set', col: 'meta', id: 'settings', data: settings }];

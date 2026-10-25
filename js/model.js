@@ -19,6 +19,9 @@ export const DEFAULT_SETTINGS = {
   jarPct: { spend: 50, save: 40, give: 10 },
   matchPct: 50, // доплата батьків до «Накопичити», % від того, що туди поклала дитина
   matchSince: 0, // доплата рахується лише із записів після цього часу
+  heartsPerCoin: 5, // щоденні звички дають ❤️, стільки сердечок = 1 монетка
+  heartsSince: 0, // сердечка рахуються з підтверджень після цього часу
+  kidMove: true, // дитина сама перекладає монетки між скарбничками
   streak: { enabled: true, days: 5, bonus: 2 }, // bonus — у монетках/гривнях поточного режиму
   pinHash: '',
   mainWishId: '',
@@ -83,7 +86,7 @@ export function balances(ledger) {
 }
 export function total(b) { return (b?.spend || 0) + (b?.save || 0) + (b?.give || 0); }
 
-const EARN_TYPES = new Set(['earn', 'bonus']);
+const EARN_TYPES = new Set(['earn', 'bonus', 'hearts']);
 
 // Розподіл винагороди по скарбничках: кожну одиницю (монетку чи гривню) отримує скарбничка
 // з найбільшим «недобором» від свого відсотка за всю історію — так частки точні в довгу,
@@ -145,6 +148,17 @@ export function currentStreak(taskId, completions, today = dayKey()) {
   return days.has(today) ? streakUntil(days, today) : streakUntil(days, addDays(today, -1));
 }
 
+// ---- сердечка за щоденні звички ----
+export function isDaily(c, tasks) {
+  return c.daily ?? tasks.find(t => t.id === c.taskId)?.repeat === 'daily';
+}
+// скільки сердечок зібрано всього і скільки «в банці» до наступної монетки
+export function hearts(data) {
+  const s = data.settings, per = Math.max(1, s.heartsPerCoin || 5);
+  const n = data.completions.filter(c => c.status === 'approved' && (c.decidedAt || 0) >= (s.heartsSince || 0) && isDaily(c, data.tasks)).length;
+  return { total: n, now: n % per, per };
+}
+
 // Доплата батьків: matchPct% від усього, що дитина заробила в «Накопичити» після matchSince,
 // цілими монетками (гривнями); запис містить лише ще не доплачену різницю.
 export function matchEntry(s, ledger, ref, now) {
@@ -166,7 +180,15 @@ export function approveOps(c, data, now = Date.now()) {
   const s = data.settings;
   const ops = [{ op: 'update', col: 'completions', id: c.id, data: { status: 'approved', decidedAt: now } }];
   const added = [];
-  if (c.price > 0) {
+  if (isDaily(c, data.tasks)) {
+    // щоденна звичка: +1 ❤️, кожне N-те сердечко перетворюється на монетку
+    const h = hearts(data), n = h.total + 1;
+    if (n % h.per === 0) {
+      const e = { ts: now, type: 'hearts', amounts: splitReward(s, data.ledger, Math.round(s.coinValue * 100)), note: `${h.per} сердечок → монетка`, icon: '❤️', ref: c.id };
+      ops.push({ op: 'set', col: 'ledger', id: `hearts_${s.heartsSince || 0}_${n / h.per}`, data: e });
+      added.push(e);
+    }
+  } else if (c.price > 0) {
     const earn = { ts: now, type: 'earn', amounts: splitReward(s, data.ledger, c.price), note: c.title, icon: c.icon, ref: c.id };
     ops.push({ op: 'set', col: 'ledger', id: 'earn_' + c.id, data: earn });
     added.push(earn);

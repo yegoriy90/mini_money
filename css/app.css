@@ -416,3 +416,31 @@ legend + * { clear: both; }
 .wish-have b { color: var(--ink); font-size: 20px; }
 .wish-have small { width: 100%; font-size: 13px; text-transform: none; letter-spacing: 0; }
 .dream-info .wish-have small { width: auto; }
+
+/* щоденні звички й сердечка */
+.sec-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 22px 4px 12px; }
+.sec-row .sec { margin: 0; }
+.hearts-bar { display: inline-flex; align-items: center; gap: 4px; background: var(--card); padding: 8px 14px; border-radius: 999px; box-shadow: var(--shadow); font-size: 26px; }
+.hearts-bar span { filter: grayscale(.2); opacity: .55; transition: transform .3s; }
+.hearts-bar span.on { opacity: 1; filter: none; animation: pulse 1.8s infinite; }
+.hearts-bar em { font-style: normal; font-weight: 900; color: var(--muted); margin: 0 4px; font-size: 20px; }
+.cele-hearts { margin: 4px 0 8px; }
+.task-form:has(input[name="repeat"][value="daily"]:checked) .price-field { display: none; }
+.task-form:not(:has(input[name="repeat"][value="daily"]:checked)) .daily-hint { display: none; }
+
+/* перекладання монеток */
+.move-modal { width: min(640px, 100%); }
+.mv-jars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mv-jar { background: color-mix(in srgb, var(--jar) 12%, var(--card)); border: 4px solid transparent; border-radius: 22px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mv-jar.on { border-color: var(--jar); }
+.mv-art { width: 70px; height: 66px; }
+.mv-art .emoji-mascot { font-size: 50px; }
+.mv-jar b { font-size: 26px; display: flex; align-items: center; gap: 4px; }
+.mv-jar small { font-weight: 800; color: var(--muted); }
+.mv-targets { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.btn.mv-to { background: var(--jar); color: #fff; box-shadow: 0 5px 0 color-mix(in srgb, var(--jar) 60%, #000 25%); font-size: 22px; min-height: 70px; }
+@media (max-width: 640px) {
+  .hearts-bar { font-size: 20px; padding: 6px 10px; }
+  .mv-art { width: 54px; height: 50px; }
+  .btn.mv-to { font-size: 18px; }
+}
