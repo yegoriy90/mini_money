@@ -31,6 +31,7 @@ export const THEMES = {
     mascots: [KITTY, KUROMI],
     jarArt: { spend: KITTY, save: KUROMI, give: emoji('💝') },
     color: '#ff5fa2',
+    celeVideo: 'assets/cele-kitty.mp4', // анімація святкування (Magnific, MiniMax H3), постер — .jpg
   },
   space: {
     title: 'Космос', preview: '🚀🪐',

@@ -1,2 +1,2 @@
-// Генерується tools/voice.md: ключі фраз, для яких є mp3.
-export const VOICE = new Set([]);
+// Генерує tools/fetch_voice.js: ключі фраз, для яких є mp3.
+export const VOICE = new Set(["cele_coins_1","cele_coins_10","cele_coins_2","cele_coins_3","cele_coins_4","cele_coins_5","cele_coins_6","cele_coins_7","cele_coins_8","cele_coins_9","cele_hearts_1","cele_hearts_2","cele_hearts_3","cele_hearts_4","empty_jar","hearts_left_1","hearts_left_2","hearts_left_3","hearts_left_4","move_done","sticker_new","task_done","wish_new","wish_request","wish_saved"]);
