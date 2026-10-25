@@ -401,7 +401,9 @@ function pSettings() {
   <fieldset><legend>Синхронізація</legend>
     ${cloud ? `<p>☁️ Увімкнена. Код сім'ї для іншого пристрою:</p><div class="family-code">${S.device.fid.slice(0, 5)}-${S.device.fid.slice(5)}</div>
       <p class="hint">На iPad або телефоні: відкрити застосунок → «У мене є код сім'ї» → ввести код. Код — як ключ від дому, не публікуйте його.</p>`
-      : cloudAvailable ? `<p>Зараз дані лише на цьому пристрої.</p><button class="btn" data-a="migrate">☁️ Увімкнути синхронізацію</button>`
+      : cloudAvailable ? `<p>Зараз дані лише на цьому пристрої.</p>
+        <div class="btn-row"><button class="btn" data-a="migrate">☁️ Увімкнути синхронізацію</button><button class="btn ghost" data-a="join-code">🔗 Приєднатися за кодом</button></div>
+        <p class="hint">«Увімкнути» — на пристрої з найсвіжішими даними (вони підуть у хмару). «Приєднатися» — на іншому: він візьме дані з хмари, а свої локальні відкладе.</p>`
       : `<p class="hint">Дані зберігаються лише на цьому пристрої. Щоб підтверджувати справи з телефона, треба один раз налаштувати Firebase (див. README).</p>`}
   </fieldset>
   <fieldset><legend>Перенести на інший пристрій</legend>
@@ -754,6 +756,12 @@ const A = {
   'ob-lib-toggle'(el) { const i = Number(el.dataset.i); S.ob.picked[i] = !S.ob.picked[i]; el.classList.toggle('on', S.ob.picked[i]); },
   'ob-create'() { obCreate(); },
   export() { exportData(); },
+  'join-code'() {
+    if (!confirm('Приєднатися до сім\'ї за кодом? Дані на цьому пристрої заміняться даними з хмари.')) return;
+    S.unwatch?.(); S.unwatch = null; S.device = null; S.data = null; S.parent = false;
+    LS.del('mm.device'); LS.del('mm.celebrated'); S.celebrated = null;
+    S.ob = { step: 'join' }; render();
+  },
 };
 
 // ---------- КОПІЯ У ФАЙЛ ----------
