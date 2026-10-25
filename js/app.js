@@ -378,6 +378,11 @@ function pSettings() {
       : cloudAvailable ? `<p>Зараз дані лише на цьому пристрої.</p><button class="btn" data-a="migrate">☁️ Увімкнути синхронізацію</button>`
       : `<p class="hint">Дані зберігаються лише на цьому пристрої. Щоб підтверджувати справи з телефона, треба один раз налаштувати Firebase (див. README).</p>`}
   </fieldset>
+  <fieldset><legend>Перенести на інший пристрій</legend>
+    <p class="hint">Без синхронізації: збережіть файл-копію і відкрийте його на iPad (Telegram, пошта, iCloud чи Google Drive → «Зберегти у Файли»). Після перенесення користуйтеся одним пристроєм — копії між собою не синхронізуються.</p>
+    <div class="btn-row"><button class="btn" data-a="export">📤 Зберегти копію</button>
+    ${cloud ? '' : `<label class="btn ghost">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>`}</div>
+  </fieldset>
   <fieldset><legend>Цей пристрій</legend>
     ${cloud ? seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"') : ''}
     <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
@@ -670,7 +675,40 @@ const A = {
   'ob-step'(el) { S.ob.step = el.dataset.v; render(); },
   'ob-lib-toggle'(el) { const i = Number(el.dataset.i); S.ob.picked[i] = !S.ob.picked[i]; el.classList.toggle('on', S.ob.picked[i]); },
   'ob-create'() { obCreate(); },
+  export() { exportData(); },
 };
+
+// ---------- КОПІЯ У ФАЙЛ ----------
+function exportData() {
+  const cols = { meta: { settings: S.data.rawSettings } };
+  for (const c of ['tasks', 'wishes', 'completions', 'ledger']) cols[c] = Object.fromEntries(S.data[c].map(({ id, ...d }) => [id, d]));
+  const blob = new Blob([JSON.stringify({ app: 'mini-money', v: 1, exportedAt: Date.now(), cols })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mini-money-${dayKey()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast('📤 Копію збережено');
+}
+
+async function importData(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { return toast('Це не файл Mini Money'); }
+  const cols = data?.cols;
+  if (data?.app !== 'mini-money' || !cols?.meta?.settings) return toast('Це не файл Mini Money');
+  if (S.device && !confirm('Замінити всі дані на цьому пристрої даними з файлу?')) return;
+  try { localStorage.setItem('mm.data.local', JSON.stringify(cols)); } catch { return toast('Не вистачає місця на пристрої'); }
+  // не показувати святкування за старі монетки
+  const maxTs = Object.values(cols.ledger || {}).reduce((m, e) => Math.max(m, e.ts || 0), 0);
+  S.celebrated = maxTs; LS.set('mm.celebrated', maxTs);
+  S.device = { fid: 'local', role: 'child' }; LS.set('mm.device', S.device);
+  S.parent = false; S.preview = false; S.view = 'tasks'; S.ob = { step: 'welcome' };
+  closeModal();
+  await connect();
+  const name = cols.meta.settings.childVoc || cols.meta.settings.childName;
+  toast('📥 Дані відкрито');
+  speak(`Привіт, ${name}!`);
+}
 
 function forgetDevice() {
   S.unwatch?.(); S.unwatch = null; S.device = null; S.data = null; S.parent = false; S.preview = false;
@@ -776,6 +814,7 @@ function renderOnboarding() {
       <div class="btn-col">
         <button class="btn big" data-a="ob-step" data-v="create">✨ Почати</button>
         ${cloudAvailable ? `<button class="btn ghost big" data-a="ob-step" data-v="join">🔗 У мене є код сім'ї</button>` : ''}
+        <label class="btn ghost big">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>
       </div></div>`;
     return;
   }
@@ -852,6 +891,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
+  if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
   if (el.dataset.change === 'photo' && el.files?.[0]) {
     try {
       M.photo = await resizeImage(el.files[0]);
