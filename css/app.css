@@ -521,3 +521,9 @@ legend + * { clear: both; }
   .car-track .task { flex-basis: 150px; }
   .car-arrow { width: 42px; height: 42px; font-size: 28px; }
 }
+
+/* своя емодзі */
+.emoji-own small { font-weight: 600; font-size: 13px; }
+.emoji-own-row { display: flex; align-items: center; gap: 12px; }
+.emoji-cur { width: 60px; height: 60px; flex: none; border-radius: 16px; background: color-mix(in srgb, var(--accent) 14%, var(--card)); display: grid; place-items: center; font-size: 38px; }
+.f .emoji-input { font-size: 30px; text-align: center; padding: 8px; }

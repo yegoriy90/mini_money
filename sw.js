@@ -1,7 +1,7 @@
 // Офлайн-кеш оболонки застосунку. При зміні файлів — підняти VERSION.
-const VERSION = 'mm-v11';
+const VERSION = 'mm-v12';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=11', 'js/app.js?v=11',
+  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=12', 'js/app.js?v=12',
   'js/model.js', 'js/store.js', 'js/library.js', 'js/themes.js', 'js/fx.js', 'js/firebase-config.js', 'audio/voice/index.js',
   'icons/icon.svg', 'assets/cele-kitty.mp4', 'assets/cele-kitty.jpg', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
 ];

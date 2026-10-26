@@ -580,6 +580,8 @@ function wishModal(w) {
       <div class="photo-prev">${M.photo ? `<img src="${M.photo}" alt="">` : `<span>📷</span><small>Сфотографуй</small>`}</div>
     </label>
     <div class="emoji-row">${WISH_ICONS.map(e => `<button class="emo${e === M.emoji && !M.photo ? ' on' : ''}" data-a="wish-emoji" data-e="${e}">${e}</button>`).join('')}</div>
+      <label class="f emoji-own">Або будь-яка своя емодзі <small>(на клавіатурі iPad — кнопка 🌐 або 😀)</small>
+        <span class="emoji-own-row"><span class="emoji-cur">${esc(M.emoji)}</span><input class="emoji-input" data-input="emoji" data-target="wish" value="${WISH_ICONS.includes(esc(M.emoji)) ? '' : esc(M.emoji)}" placeholder="😀" autocomplete="off" enterkeyhint="done"></span></label>
     <label class="f">Як називається?<input id="wishTitle" value="${esc(w?.title || '')}" placeholder="Можна сказати голосом 🎤" autocomplete="off"></label>
     <div class="f">Скільки коштує?</div>
     <div class="stepper"><button class="btn round sm10" data-a="wish-price" data-d="-10">−${10 * priceStep()}</button><button class="btn round" data-a="wish-price" data-d="-1">−</button>
@@ -589,6 +591,20 @@ function wishModal(w) {
     <div class="btn-row center">
       ${w && parent ? `<button class="btn no" data-a="wish-del">🗑 Видалити</button>` : ''}
       <button class="btn big" data-a="wish-save">⭐ Зберегти</button></div>`, 'wish-modal');
+}
+
+// остання емодзі з того, що ввели з клавіатури (одна «літера» може складатися з кількох символів: 👩‍🍳, 🇺🇦, 👍🏽)
+function lastEmoji(str) {
+  const seg = typeof Intl.Segmenter === 'function'
+    ? [...new Intl.Segmenter('uk', { granularity: 'grapheme' }).segment(str)].map(x => x.segment)
+    : [...str];
+  return seg.reverse().find(g => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g)) || '';
+}
+function setEmojiCur(e, fromPreset) {
+  const cur = $modal.querySelector('.emoji-cur');
+  if (cur) cur.textContent = e;
+  const inp = $modal.querySelector('.emoji-input');
+  if (inp && fromPreset) inp.value = '';
 }
 
 async function resizeImage(file, max = 640) {
@@ -611,6 +627,8 @@ function taskEditModal(t) {
   openModal(`<button class="x" data-a="close">✕</button><h2>${t ? 'Завдання' : 'Нове завдання'}</h2>
     <form data-form="task" class="task-form">
       <div class="emoji-row">${TASK_ICONS.map(e => `<button type="button" class="emo${e === M.icon ? ' on' : ''}" data-a="task-icon" data-e="${e}">${e}</button>`).join('')}</div>
+      <label class="f emoji-own">Або будь-яка своя емодзі <small>(на клавіатурі iPad — кнопка 🌐 або 😀)</small>
+        <span class="emoji-own-row"><span class="emoji-cur">${esc(M.icon)}</span><input class="emoji-input" data-input="emoji" data-target="task" value="${TASK_ICONS.includes(esc(M.icon)) ? '' : esc(M.icon)}" placeholder="😀" autocomplete="off" enterkeyhint="done"></span></label>
       <label class="f">Назва<input name="title" value="${esc(t?.title || '')}" required placeholder="Наприклад: застелити ліжко"></label>
       <p class="hint daily-hint">Щоденні звички дають ❤️ — ${s.heartsPerCoin} сердечок = 1 монетка.</p>
       <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['', '☀️ Протягом дня']])}</div>
@@ -774,6 +792,7 @@ const A = {
     M.emoji = el.dataset.e; M.photo = '';
     $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.toggle('on', b === el));
     $modal.querySelector('.photo-prev').innerHTML = `<span>${M.emoji}</span><small>або сфотографуй</small>`;
+    setEmojiCur(M.emoji, true);
   },
   'wish-price'(el) {
     M.price = Math.max(priceStep(), M.price + Number(el.dataset.d) * priceStep());
@@ -819,7 +838,7 @@ const A = {
   'exit-preview'() { S.preview = false; render(); },
   'task-new'() { taskEditModal(null); },
   'task-edit'(el) { taskEditModal(findT(el.dataset.id)); },
-  'task-icon'(el) { M.icon = el.dataset.e; $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.toggle('on', b === el)); },
+  'task-icon'(el) { M.icon = el.dataset.e; $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.toggle('on', b === el)); setEmojiCur(M.icon, true); },
   async 'task-toggle'(el) { const t = findT(el.dataset.id); await db([{ op: 'update', col: 'tasks', id: t.id, data: { active: t.active === false } }]); },
   async 'task-del'() {
     if (!confirm('Видалити завдання? Історія монеток залишиться.')) return;
@@ -1104,6 +1123,20 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target.dataset.input === 'emoji') {
+    const em = lastEmoji(e.target.value);
+    if (!em) return;
+    e.target.value = em;
+    if (e.target.dataset.target === 'task') M.icon = em;
+    else {
+      M.emoji = em; M.photo = '';
+      const prev = $modal.querySelector('.photo-prev');
+      if (prev) prev.innerHTML = `<span>${esc(em)}</span><small>або сфотографуй</small>`;
+    }
+    $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.toggle('on', b.dataset.e === em));
+    setEmojiCur(em);
+    sound.tap();
+  }
   if (e.target.dataset.input === 'ob-name') {
     const voc = e.target.form.querySelector('[name="childVoc"]');
     if (!voc.dataset.touched) voc.value = vocative(e.target.value);
