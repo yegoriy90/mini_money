@@ -66,6 +66,12 @@ function onData(state) {
     });
     if (ops.length) db(ops);
   }
+  if (state.ready && state.settings && !LS.get('mm.migr.both', false)) {
+    LS.set('mm.migr.both', true);
+    const both = new Set(Object.values(LIBRARY).flat().filter(x => x.time === 'both').map(x => x.title));
+    const ops = state.tasks.filter(t => t.repeat === 'daily' && !t.time && both.has(t.title)).map(t => ({ op: 'update', col: 'tasks', id: t.id, data: { time: 'both' } }));
+    if (ops.length) db(ops);
+  }
   render();
   checkCelebrate();
 }
@@ -195,18 +201,21 @@ function kidTasks() {
   const today = dayKey();
   const bal = balances(S.data.ledger);
   const rank = { open: 0, pending: 1, approved: 2 };
-  const all = S.data.tasks.filter(t => t.active !== false)
-    .map(t => ({ t, ts: taskState(t, S.data.completions, today) }))
-    .sort((a, b) => rank[a.ts.status] - rank[b.ts.status]);
   const part = dayPart();
-  const daily = all.filter(x => x.t.repeat === 'daily' && (part === 'all' || !x.t.time || x.t.time === part)), other = all.filter(x => x.t.repeat !== 'daily');
+  // звичка «двічі на день» — дві окремі картки: ранкова й вечірня
+  const all = S.data.tasks.filter(t => t.active !== false)
+    .flatMap(t => t.repeat === 'daily' && t.time === 'both'
+      ? ['morning', 'evening'].filter(sl => part === 'all' || part === sl).map(slot => ({ t, slot, ts: taskState(t, S.data.completions, today, slot) }))
+      : [{ t, ts: taskState(t, S.data.completions, today) }])
+    .sort((a, b) => rank[a.ts.status] - rank[b.ts.status]);
+  const daily = all.filter(x => x.t.repeat === 'daily' && (part === 'all' || !x.t.time || x.t.time === part || x.slot)), other = all.filter(x => x.t.repeat !== 'daily');
   const hasParts = all.some(x => x.t.repeat === 'daily' && x.t.time);
   const dailyDone = daily.filter(x => x.ts.status === 'approved').length;
   const otherDone = other.filter(x => x.ts.status === 'approved' || x.ts.approvedToday).length;
   // справи — каруселькою: свайп убік, стрілки для тих, хто ще не вміє свайпати
   const grid = (list, key) => `<div class="carousel at-start" data-carousel="${key}">
     <button class="car-arrow prev" data-a="car" data-d="-1" aria-label="Назад">‹</button>
-    <div class="car-track">${list.map(({ t, ts }) => taskCard(t, ts)).join('')}</div>
+    <div class="car-track">${list.map(({ t, ts, slot }) => taskCard(t, ts, slot)).join('')}</div>
     <button class="car-arrow next" data-a="car" data-d="1" aria-label="Далі">›</button></div>`;
   return `<section class="summary">${jarsBlock(bal)}${dreamCard(bal)}</section>
     ${daily.length || hasParts ? `<div class="sec-row"><h2 class="sec">${{ morning: '🌅 Ранкові', evening: '🌙 Вечірні', all: 'Щоденні' }[part]} звички <span class="pill">${dailyDone} / ${daily.length}</span></h2>${heartsBar()}</div>
@@ -225,10 +234,12 @@ function heartsBar() {
     <em>→</em>${coinIcon()}</button>`;
 }
 
-function taskCard(t, ts) {
+const SLOT_ICON = { morning: '🌅', evening: '🌙' };
+function taskCard(t, ts, slot) {
   const streak = t.repeat === 'daily' ? currentStreak(t.id, S.data.completions) : 0;
   const cls = ts.status === 'approved' ? 'done' : ts.status === 'pending' ? 'wait' : '';
-  return `<button class="task ${cls}" data-a="task-open" data-id="${t.id}">
+  return `<button class="task ${cls}" data-a="task-open" data-id="${t.id}"${slot ? ` data-slot="${slot}"` : ''}>
+    ${slot ? `<span class="t-slot">${SLOT_ICON[slot]}</span>` : ''}
     <span class="t-icon">${esc(t.icon || '⭐')}</span>
     <span class="t-title">${esc(t.title)}</span>
     <span class="t-price">${t.repeat === 'daily' ? '<span class="coins">❤️</span>' : coins(t.price)}</span>
@@ -281,7 +292,7 @@ function kidProgress() {
   const st_ = stickers();
   return `<div class="sec-row"><h2 class="sec">Мої наліпки <span class="pill">${st_.count} / ${STICKERS.length}</span></h2>
       ${st_.count < STICKERS.length ? `<div class="sticker-next">ще ${st_.left} ${plural(st_.left, ['справа', 'справи', 'справ'])} до нової <div class="mini-bar"><i style="width:${(STICKER_EVERY - st_.left) / STICKER_EVERY * 100}%"></i></div></div>` : ''}</div>
-    <div class="album">${STICKERS.map((e, i) => `<button class="sticker${i < st_.count ? ' got' : ''}" data-a="say-sticker" data-i="${i}">${i < st_.count ? e : '❔'}</button>`).join('')}</div>
+    <div class="album">${STICKERS.map((e, i) => `<button class="sticker${i < st_.count ? ' got' : ''}" data-a="say-sticker" data-i="${i}" aria-label="${i < st_.count ? esc(e.name) : 'Ще закрита наліпка'}"><img src="${e.img}" alt="" loading="lazy"></button>`).join('')}</div>
     <h2 class="sec">Мій тиждень</h2>
     <div class="week">${week.map((x, i) => `<div class="day${x.d === today ? ' today' : ''}${x.d > today ? ' future' : ''}">
       <small>${days[i]}</small><div class="stars">${x.n ? (x.n <= 4 ? '⭐'.repeat(x.n) : `⭐<b>${x.n}</b>`) : (x.d < today ? '·' : '')}</div></div>`).join('')}</div>
@@ -348,12 +359,12 @@ function pApprove() {
   const doneToday = S.data.completions.filter(c => c.status === 'approved' && c.date === today).reverse();
   if (!pend.length && !req.length) {
     return `<div class="empty-big">🎉<b>Усе перевірено</b><small>Коли ${esc(s.childName)} позначить справу, вона з'явиться тут</small></div>
-      ${doneToday.length ? `<h3>Сьогодні вже зроблено</h3><div class="list">${doneToday.map(c => `<div class="row"><span class="r-icon">${esc(c.icon)}</span><span class="r-main">${esc(c.title)}</span><span class="r-meta">${rewardText(c)}</span></div>`).join('')}</div>` : ''}`;
+      ${doneToday.length ? `<h3>Сьогодні вже зроблено</h3><div class="list">${doneToday.map(c => `<div class="row"><span class="r-icon">${esc(c.icon)}</span><span class="r-main">${esc(c.title)}${c.slot ? ' ' + SLOT_ICON[c.slot] : ''}</span><span class="r-meta">${rewardText(c)}</span></div>`).join('')}</div>` : ''}`;
   }
   return `${pend.length > 1 ? `<button class="btn big wide" data-a="approve-all">✅ Підтвердити все (${pend.length})</button>` : ''}
     ${pend.length ? `<h3>Виконані справи</h3><div class="list">${pend.map(c => `<div class="row">
       <span class="r-icon">${esc(c.icon)}</span>
-      <span class="r-main">${esc(c.title)}<small>${when(c.createdAt)}</small></span>
+      <span class="r-main">${esc(c.title)}${c.slot ? ' ' + SLOT_ICON[c.slot] : ''}<small>${when(c.createdAt)}</small></span>
       <span class="r-meta">${rewardText(c)}</span>
       <span class="r-act"><button class="btn ok" data-a="approve" data-id="${c.id}">✓</button><button class="btn no" data-a="reject" data-id="${c.id}">✕</button></span>
     </div>`).join('')}</div>` : ''}
@@ -374,7 +385,7 @@ function pTasks() {
   const act = S.data.tasks.filter(t => t.active !== false), off = S.data.tasks.filter(t => t.active === false);
   const row = t => `<div class="row${t.active === false ? ' muted' : ''}">
     <span class="r-icon">${esc(t.icon)}</span>
-    <span class="r-main">${esc(t.title)}<small>${REPEAT[t.repeat] || ''}</small></span>
+    <span class="r-main">${esc(t.title)}<small>${t.time === 'both' ? 'двічі на день' : REPEAT[t.repeat] || ''}</small></span>
     <span class="r-meta">${t.repeat === 'daily' ? '❤️' : moneyFull(t.price, s)}</span>
     <span class="r-act"><button class="btn ghost sm" data-a="task-edit" data-id="${t.id}">✏️</button>
     <button class="btn ghost sm" data-a="task-toggle" data-id="${t.id}">${t.active === false ? '▶️' : '⏸'}</button></span>
@@ -536,13 +547,13 @@ function sayPrice(t) {
   return sayF('price_many', 'За це — багато монеток!');
 }
 
-function taskModal(t) {
-  const s = st(), ts = taskState(t, S.data.completions);
+function taskModal(t, slot) {
+  const s = st(), ts = taskState(t, S.data.completions, dayKey(), slot);
   const streak = t.repeat === 'daily' ? currentStreak(t.id, S.data.completions) : 0;
   const can = ts.status === 'open';
-  M = { taskId: t.id };
+  M = { taskId: t.id, slot };
   openModal(`<button class="x" data-a="close">✕</button>
-    <div class="tm-icon">${esc(t.icon)}</div>
+    <div class="tm-icon">${esc(t.icon)}${slot ? `<span class="tm-slot">${SLOT_ICON[slot]}</span>` : ''}</div>
     <h2 class="tm-title">${esc(t.title)}</h2>
     <div class="tm-price">${t.repeat === 'daily' ? '❤️' : coins(t.price, 10)}</div>
     ${t.repeat === 'daily' ? `<div class="tm-streak">${hearts(S.data).per} сердечок = 1 монетка</div>` : t.price ? '' : `<div class="tm-streak">Корисна звичка: збирай серію 🔥</div>`}
@@ -636,7 +647,7 @@ function taskEditModal(t) {
         <span class="emoji-own-row"><span class="emoji-cur">${esc(M.icon)}</span><input class="emoji-input" data-input="emoji" data-target="task" value="${TASK_ICONS.includes(esc(M.icon)) ? '' : esc(M.icon)}" placeholder="😀" autocomplete="off" enterkeyhint="done"></span></label>
       <label class="f">Назва<input name="title" value="${esc(t?.title || '')}" required placeholder="Наприклад: застелити ліжко"></label>
       <p class="hint daily-hint">Щоденні звички дають ❤️ — ${s.heartsPerCoin} сердечок = 1 монетка.</p>
-      <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['', '☀️ Протягом дня']])}</div>
+      <div class="daily-hint"><div class="f">Коли</div>${seg('time', t?.time || '', [['morning', '🌅 Ранок'], ['evening', '🌙 Вечір'], ['both', '🌅🌙 Двічі'], ['', '☀️ Протягом дня']])}</div>
       <label class="f price-field">Ціна, ${s.currency === 'uah' ? 'грн' : 'монеток'}<input name="price" type="number" inputmode="decimal" min="0" step="${s.currency === 'uah' ? 1 : 0.5}" value="${t ? fromK(t.price, s) : 1}" required></label>
       <div class="f">Як часто</div>${seg('repeat', t?.repeat || 'daily', [['daily', 'Щодня'], ['any', 'Будь-коли'], ['once', 'Один раз']])}
       <div class="btn-row center">${t ? `<button type="button" class="btn no" data-a="task-del">🗑 Видалити</button>` : ''}<button class="btn big" type="submit">Зберегти</button></div>
@@ -699,7 +710,7 @@ function checkCelebrate() {
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
-      ${newSticker ? `<div class="cele-sticker"><span>${newSticker}</span>Нова наліпка!</div>` : ''}
+      ${newSticker ? `<div class="cele-sticker"><img src="${newSticker.img}" alt="">Нова наліпка!</div>` : ''}
       <div class="cele-list">${items.map(x => `<span>${x}</span>`).join('')}</div>
       <small>торкнись, щоб закрити</small></div>`, 'cele-modal');
     confetti(sum ? 70 : 35); sound.fanfare();
@@ -782,15 +793,15 @@ const A = {
     const w = findW(el.dataset.id), s = st(), p = wishProgress(w, balances(S.data.ledger));
     p.enough ? sayF('wish_enough', 'Вже можна купувати!') : sayF('wish_collect', 'Збирай монетки на свою мрію!');
   },
-  'task-open'(el) { sound.tap(); taskModal(findT(el.dataset.id)); },
+  'task-open'(el) { sound.tap(); taskModal(findT(el.dataset.id), el.dataset.slot); },
   'say-task'() { sayPrice(findT(M.taskId)); },
   async 'task-done'() {
-    const t = findT(M.taskId), today = dayKey();
-    const id = t.repeat === 'daily' ? `${t.id}_${today}` : uid();
+    const t = findT(M.taskId), today = dayKey(), slot = M.slot;
+    const id = t.repeat === 'daily' ? `${t.id}_${today}${slot ? '_' + slot : ''}` : uid();
     closeModal();
     sound.done(); confetti(18);
     sayF('task_done', 'Супер! Скажи мамі або татові, щоб вони перевірили.');
-    await db([{ op: 'set', col: 'completions', id, data: { taskId: t.id, title: t.title, icon: t.icon, price: t.repeat === 'daily' ? 0 : t.price, daily: t.repeat === 'daily', date: today, status: 'pending', createdAt: Date.now() } }]);
+    await db([{ op: 'set', col: 'completions', id, data: { taskId: t.id, title: t.title, icon: t.icon, price: t.repeat === 'daily' ? 0 : t.price, daily: t.repeat === 'daily', ...(slot ? { slot } : {}), date: today, status: 'pending', createdAt: Date.now() } }]);
   },
   'wish-new'() { sound.tap(); wishModal(null); sayF('wish_new', 'Яка в тебе мрія? Сфотографуй її!'); },
   'wish-edit'(el) { wishModal(findW(el.dataset.id)); },

@@ -118,8 +118,9 @@ export function splitReward(s, ledger, amountK) {
 }
 
 // ---- завдання на сьогодні ----
-export function taskState(task, completions, today = dayKey()) {
-  const mine = completions.filter(c => c.taskId === task.id);
+// slot — 'morning' | 'evening' для звичок «двічі на день» (time: 'both')
+export function taskState(task, completions, today = dayKey(), slot) {
+  const mine = completions.filter(c => c.taskId === task.id && (!slot || c.slot === slot));
   const todays = mine.filter(c => c.date === today);
   const pending = mine.filter(c => c.status === 'pending');
   const approvedToday = todays.filter(c => c.status === 'approved').length;
@@ -187,7 +188,9 @@ export function approveOps(c, data, now = Date.now()) {
     // щоденна звичка: +1 ❤️ (+ бонусні за серію), кожні N сердечок перетворюються на монетку
     const h = hearts(data);
     let gain = 1;
-    if (s.streak.enabled && s.streak.days > 1 && s.streak.bonus > 0) {
+    // бонус серії — лише за перше підтвердження звички за день (звичка «двічі» не дає подвійний бонус)
+    const firstToday = !data.completions.some(x => x.id !== c.id && x.taskId === c.taskId && x.date === c.date && x.status === 'approved');
+    if (firstToday && s.streak.enabled && s.streak.days > 1 && s.streak.bonus > 0) {
       const days = approvedDays(c.taskId, data.completions);
       days.add(c.date);
       const streak = streakUntil(days, c.date);
