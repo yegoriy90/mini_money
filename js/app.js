@@ -526,9 +526,14 @@ function toast(msg) {
 // записаний голос — лише жіночі форми («Молодчинка»), для хлопчика — синтезатор
 function sayF(keys, text) { return isF() ? say(keys, text) : speak(text); }
 
+// Голос каже лише заготовлені загальні фрази (без назв справ і сум) — див. audio/voice
+const JAR_SAY = { spend: ['jar_spend', 'Це монетки, щоб купити щось уже скоро!'], save: ['jar_save', 'Це монетки на твою велику мрію!'], give: ['jar_give', 'Це монетки, щоб порадувати когось!'] };
 function sayPrice(t) {
-  if (t.repeat === 'daily') return `${t.title}. За це — сердечко! ${hearts(S.data).per} сердечок — це монетка.`;
-  return t.price ? `${t.title}. ${money(t.price, st(), { words: true })}.` : `${t.title}. Це твоя корисна звичка — збирай серію!`;
+  if (t.repeat === 'daily') return sayF('price_heart', 'За це — сердечко!');
+  if (!t.price) return sayF('habit', 'Це твоя корисна звичка!');
+  const n = fromK(t.price, st());
+  if (st().currency === 'coins' && Number.isInteger(n) && n >= 1 && n <= 5) return sayF(`price_${n}`, `За це — ${money(t.price, st(), { words: true })}!`);
+  return sayF('price_many', 'За це — багато монеток!');
 }
 
 function taskModal(t) {
@@ -548,7 +553,7 @@ function taskModal(t) {
         : ts.status === 'pending' ? `<div class="tm-state">⏳ Чекаємо, поки мама чи тато перевірять</div>`
         : `<div class="tm-state">✓ Вже зроблено сьогодні. Молодець!</div>`}
     </div>`, 'task-modal');
-  speak(sayPrice(t));
+  sayPrice(t);
 }
 
 let pinBuf = '';
@@ -700,8 +705,10 @@ function checkCelebrate() {
     confetti(sum ? 70 : 35); sound.fanfare();
     const left = h.per - h.now;
     const coinsN = fromK(sum, s);
-    sayF(sum ? [`cele_coins_${coinsN}`, newSticker && 'sticker_new'] : [`cele_hearts_${n}`, `hearts_left_${left}`, newSticker && 'sticker_new'], (sum ? `Ура! ${wow}! Плюс ${money(sum, s, { words: true })}!`
-      : `${wow}! Плюс ${n} ${plural(n, ['сердечко', 'сердечка', 'сердечок'])}! Ще ${left} — і буде монетка!`) + (newSticker ? ' І нова наліпка!' : ''));
+    const coinKey = s.currency === 'coins' && Number.isInteger(coinsN) && coinsN >= 1 && coinsN <= 10 ? `cele_coins_${coinsN}` : 'cele_coins_many';
+    const heartKey = n >= 1 && n <= 4 ? `cele_hearts_${n}` : 'cele_hearts_many';
+    sayF(sum ? [coinKey, newSticker && 'sticker_new'] : [heartKey, left >= 1 && left <= 5 && `hearts_left_${left}`, newSticker && 'sticker_new'],
+      (sum ? `Ура! ${wow}! Плюс монетки!` : `${wow}! Плюс сердечко!`) + (newSticker ? ' І нова наліпка!' : ''));
   }, 300);
 }
 
@@ -711,7 +718,7 @@ function moveModal(from) {
   openModal('', 'move-modal');
   renderMove();
   const s = st();
-  speak(`${JAR_META[from].title}: ${money(balances(S.data.ledger)[from], s, { words: true })}. Куди перекласти?`);
+  sayF([JAR_SAY[from][0], 'move_where'], `${JAR_SAY[from][1]} Куди перекласти монетки?`);
 }
 function moveLive() {
   const b = balances(S.data.ledger);
@@ -760,24 +767,23 @@ const A = {
     tr.scrollBy({ left: Number(el.dataset.d) * tr.clientWidth * 0.8, behavior: 'smooth' });
     sound.tap();
   },
-  'say-sticker'(el) { const i = Number(el.dataset.i), c = stickers().count; speak(i < c ? 'Твоя наліпка!' : `Ще ${stickers().left} ${plural(stickers().left, ['справа', 'справи', 'справ'])} — і буде нова наліпка!`); },
+  'say-sticker'(el) { Number(el.dataset.i) < stickers().count ? sayF('sticker_mine', 'Це твоя наліпка!') : sayF('sticker_soon', 'Роби справи — і буде нова наліпка!'); },
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
-  'say-hearts'() { const h = hearts(S.data); speak(`У тебе ${h.now} з ${h.per} сердечок. Ще ${h.per - h.now} — і буде монетка!`); },
+  'say-hearts'() { const h = hearts(S.data), left = h.per - h.now; sayF(left <= 5 ? `hearts_left_${left}` : 'price_heart', 'Збирай сердечка — і буде монетка!'); },
   'kid-view'(el) { sound.tap(); S.view = el.dataset.v; render(); window.scrollTo(0, 0); },
-  'say-total'() { const s = st(); speak(`У тебе ${money(total(balances(S.data.ledger)), s, { words: true })}`); sound.coin(); },
+  'say-total'() { sayF('total_coins', 'Ось скільки в тебе монеток!'); sound.coin(); },
   'say-jar'(el) {
-    const s = st(), j = el.dataset.j, b = balances(S.data.ledger)[j];
-    const what = { spend: 'Це на те, що хочеш купити скоро.', save: 'Це на велику мрію.', give: 'Це щоб зробити подарунок або допомогти комусь.' }[j];
+    const s = st(), j = el.dataset.j;
     sound.coin();
     if (s.jarsEnabled && s.kidMove && !isParentView()) return moveModal(j);
-    speak(s.jarsEnabled ? `${JAR_META[j].title}: ${money(b, s, { words: true })}. ${what}` : `У скарбничці ${money(b, s, { words: true })}`);
+    s.jarsEnabled ? sayF(...JAR_SAY[j]) : sayF('total_coins', 'Ось скільки в тебе монеток!');
   },
   'say-wish'(el) {
     const w = findW(el.dataset.id), s = st(), p = wishProgress(w, balances(S.data.ledger));
-    speak(`${w.title || 'Моя мрія'}. Коштує ${money(w.price, s, { words: true })}. ${s.jarsEnabled ? `У скарбничці ${JAR_META[wishJar(w)].title} вже ${money(p.have, s, { words: true })}.` : ''} ${p.enough ? 'Вже можна купувати!' : `Залишилось ${money(p.left, s, { words: true })}.`}`);
+    p.enough ? sayF('wish_enough', 'Вже можна купувати!') : sayF('wish_collect', 'Збирай монетки на свою мрію!');
   },
   'task-open'(el) { sound.tap(); taskModal(findT(el.dataset.id)); },
-  'say-task'() { speak(sayPrice(findT(M.taskId))); },
+  'say-task'() { sayPrice(findT(M.taskId)); },
   async 'task-done'() {
     const t = findT(M.taskId), today = dayKey();
     const id = t.repeat === 'daily' ? `${t.id}_${today}` : uid();
@@ -918,9 +924,8 @@ async function importData(file) {
   S.parent = false; S.preview = false; S.view = 'tasks'; S.ob = { step: 'welcome' };
   closeModal();
   await connect();
-  const name = cols.meta.settings.childVoc || cols.meta.settings.childName;
   toast('📥 Дані відкрито');
-  speak(`Привіт, ${name}!`);
+  sayF('hello', 'Привіт! Давай збирати монетки!');
 }
 
 function forgetDevice() {
@@ -1096,7 +1101,7 @@ async function obCreate() {
     S.ob = { step: 'welcome' };
     S.celebrated = null; LS.del('mm.celebrated');
     await connect();
-    if (S.device.role === 'child') speak(`Привіт, ${settings.childVoc}! Давай збирати монетки!`);
+    if (S.device.role === 'child') sayF('hello', 'Привіт! Давай збирати монетки!');
   } catch (e) { toast('Помилка: ' + e.message); }
 }
 

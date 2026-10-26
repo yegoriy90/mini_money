@@ -232,7 +232,7 @@ h1, h2, h3 { margin: 0; }
 .modal-back { position: absolute; inset: 0; background: rgba(40, 20, 50, .45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fade .2s; }
 .modal-card { position: relative; background: var(--card); color: var(--ink); border-radius: 30px; padding: 26px 22px 20px; width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); animation: pop .25s cubic-bezier(.3, 1.5, .5, 1); }
 .modal-card h2 { font-size: 26px; font-weight: 900; margin-bottom: 12px; padding-right: 40px; }
-.x { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; border-radius: 50%; background: var(--bg); font-size: 20px; font-weight: 900; }
+.x { position: absolute; z-index: 5; top: 14px; right: 14px; width: 44px; height: 44px; border-radius: 50%; background: var(--bg); font-size: 20px; font-weight: 900; }
 @keyframes pop { from { transform: scale(.8); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 .task-modal { text-align: center; }

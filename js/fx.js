@@ -29,7 +29,7 @@ let voiceOn = true;
 // iOS грає звук лише з елемента, «розблокованого» дотиком, тож тримаємо один плеєр на весь застосунок
 const player = new Audio();
 player.preload = 'auto';
-let queue = [], fallback = '';
+let queue = [];
 window.addEventListener('pointerdown', () => {
   if (player.dataset.unlocked) return;
   player.dataset.unlocked = '1';
@@ -42,15 +42,18 @@ function next() {
   const k = queue.shift();
   if (!k) return;
   player.src = new URL(`../audio/voice/${k}.mp3`, import.meta.url).href;
-  player.play().catch(() => { queue = []; speak(fallback); });
+  player.play().catch(() => { queue = []; });
 }
 export function setVoice(on) { voiceOn = on; }
 export function say(keys, text) {
   const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
-  if (!voiceOn || !list.length || !list.every(k => VOICE.has(k))) return speak(text);
+  // лише записані фрази: синтезатор — тільки коли голос вимкнено (для хлопчика), відсутні кліпи пропускаємо
+  if (!voiceOn) return speak(text);
+  const have = list.filter(k => VOICE.has(k));
+  if (!have.length) return;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   player.pause();
-  queue = list; fallback = text;
+  queue = have;
   next();
 }
 
