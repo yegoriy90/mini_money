@@ -533,3 +533,8 @@ legend + * { clear: both; }
 .t-slot { position: absolute; top: 8px; right: 10px; font-size: 26px; }
 .task .t-slot ~ .t-badge.ok, .task .t-slot ~ .t-badge.wait { right: -8px; }
 .tm-slot { font-size: 48px; vertical-align: top; margin-left: -10px; }
+/* звіт: справи по днях */
+.rep-day { margin: 18px 6px 8px; font-weight: 900; font-size: 16px; display: flex; justify-content: space-between; color: var(--ink); }
+.rep-day small { color: var(--muted); font-weight: 800; }
+.rep-st { font-size: 20px; min-width: 28px; justify-content: center; }
+.row.rejected .r-main { text-decoration: line-through; }

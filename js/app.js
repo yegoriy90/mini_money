@@ -452,7 +452,22 @@ function pReport() {
     </div>
     <h3>По днях</h3>
     <div class="rep-bars">${perDay.map((n, i) => `<div class="rep-bar"><i style="height:${n / maxDay * 100}%"></i><b>${n || ''}</b><small>${days[i]}</small></div>`).join('')}</div>
-    ${top.length ? `<h3>Найчастіше</h3><div class="list">${top.map(([t, x]) => `<div class="row"><span class="r-icon">${esc(x.icon)}</span><span class="r-main">${esc(t)}</span><span class="r-meta">×${x.n}</span></div>`).join('')}</div>` : '<div class="empty-note">Цього тижня справ ще не було</div>'}`;
+    ${top.length ? `<h3>Найчастіше</h3><div class="list">${top.map(([t, x]) => `<div class="row"><span class="r-icon">${esc(x.icon)}</span><span class="r-main">${esc(t)}</span><span class="r-meta">×${x.n}</span></div>`).join('')}</div>` : '<div class="empty-note">Цього тижня справ ще не було</div>'}
+    ${repTimeline(mon, sun)}`;
+}
+
+// усі справи тижня по днях, від нових до старих (разом із тими, що чекають чи відхилені)
+function repTimeline(mon, sun) {
+  const list = S.data.completions.filter(c => c.date >= mon && c.date <= sun).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (!list.length) return '';
+  const st = { approved: ['✅', ''], pending: ['⏳', ' muted'], rejected: ['✕', ' muted rejected'] };
+  const byDay = list.reduce((m, c) => ((m[c.date] ||= []).push(c), m), {});
+  const dayTitle = k => { const t = new Date(k + 'T12:00').toLocaleDateString('uk-UA', { weekday: 'long', day: 'numeric', month: 'long' }); return t[0].toUpperCase() + t.slice(1); };
+  return `<h3>Усі справи по днях</h3>${Object.entries(byDay).map(([d, cs]) => `<div class="rep-day">${dayTitle(d)} <small>${cs.filter(c => c.status === 'approved').length} ✅</small></div>
+    <div class="list">${cs.map(c => `<div class="row${st[c.status]?.[1] || ''}">
+      <span class="r-icon">${esc(c.icon)}</span>
+      <span class="r-main">${esc(c.title)}${c.slot ? ' ' + SLOT_ICON[c.slot] : ''}<small>${new Date(c.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}${c.status === 'pending' ? ' · чекає перевірки' : c.status === 'rejected' ? ' · відхилено' : ''}</small></span>
+      <span class="r-meta">${rewardText(c)}</span><span class="r-act rep-st">${st[c.status]?.[0] || ''}</span></div>`).join('')}</div>`).join('')}`;
 }
 
 function seg(name, value, opts) {
