@@ -1,0 +1,134 @@
+/* ---------- «Candy»: сучасний яскравий мінімалізм (v24) ----------
+   Колір теми — від обраного компаньйона (themes.js → applyColors: --tab, --tab-2, --tab-deep на <html>).
+   Дитячий екран і онбординг — суцільний колір, герой на «склі», білі картки без рамок, кнопки-«таблетки».
+   Батьківський режим — світлий, з акцентом кольору компаньйона. html[data-view]: tasks / dreams / progress / parent / onboarding. */
+
+:root {
+  --tab: #a98bf0; --tab-2: #d2c2ff; --tab-deep: #8263e0;
+  --glass: rgba(255, 255, 255, .24);
+  --glass-2: rgba(255, 255, 255, .38);
+  --on-tab: #ffffff;
+  --shadow: 0 10px 28px rgba(70, 20, 80, .10);
+  --line: #f1e4ef;
+  --ink: #2f1d3a;
+  --muted: #8b7a94;
+  --accent: var(--tab-deep);
+  --accent-2: var(--tab);
+}
+html[data-view="tasks"], html[data-view="dreams"], html[data-view="progress"], html[data-view="onboarding"] { background: var(--tab); }
+html[data-view="tasks"] body, html[data-view="dreams"] body, html[data-view="progress"] body, html[data-view="onboarding"] body {
+  background: linear-gradient(170deg, var(--tab-2) 0%, var(--tab) 48%, var(--tab-deep) 140%);
+  min-height: 100dvh;
+}
+html[data-view="parent"] { background: #f7f3f9; }
+html[data-view="parent"] body { background: #f7f3f9; }
+
+/* ---------- вибір компаньйона ---------- */
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+.comp-grid.big { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.comp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border-radius: 24px; background: linear-gradient(170deg, var(--cl), var(--c)); color: #fff; cursor: pointer; transition: transform .12s; }
+.comp:active { transform: scale(.95); }
+.comp input { position: absolute; opacity: 0; pointer-events: none; }
+.comp-pic { position: relative; width: 100%; aspect-ratio: 1; display: block; }
+.comp-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .18)); }
+.comp b { font-size: 15px; font-weight: 900; text-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
+.comp small { font-size: 12px; font-weight: 700; opacity: .9; }
+.comp:has(input:checked), .comp.on { outline: 4px solid var(--c); outline-offset: 3px; box-shadow: 0 0 0 3px #fff inset; }
+.comp:has(input:checked)::after, .comp.on::after { content: "✓"; position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: var(--c); font-weight: 900; display: grid; place-items: center; font-size: 15px; }
+.comp-grid.big .comp-pic { aspect-ratio: auto; height: clamp(130px, 22vh, 190px); }
+.comp-modal { width: min(940px, 100%); }
+.kid-top .mascot.m1 { cursor: pointer; }
+h1 .hero-img { display: inline-block; height: 1.25em; width: auto; vertical-align: middle; filter: none; }
+
+/* ---------- кнопки: плоскі «таблетки» ---------- */
+.btn { border-radius: 999px; box-shadow: none; padding: 12px 22px; }
+.btn:active:not(:disabled) { transform: scale(.96); box-shadow: none; }
+.btn.ghost { background: #fff; border: 2px solid var(--line); box-shadow: none; }
+.btn.ok, .btn.no { box-shadow: none; }
+.btn.big { border-radius: 999px; }
+.btn.round { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* ---------- дитячий екран на кольорі ---------- */
+.kid .hello h1 { color: var(--on-tab); letter-spacing: -.8px; }
+.kid .hello .sub { color: rgba(255, 255, 255, .85); }
+.kid .mascot svg, .kid .mascot img { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .14)); }
+.kid .total-pill { box-shadow: var(--shadow); color: var(--ink); }
+
+/* скарбнички — герої на «склі» */
+.kid .jar { background: var(--glass); box-shadow: none; border-radius: 32px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.kid .jar-glass { background: var(--glass-2); border: 0; border-radius: 28px; }
+.kid .jar-glass::before { display: none; }
+.kid .jar-fill { background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .85)); }
+.kid .jar-art img, .kid .jar-art svg { filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .15)); }
+.kid .jar-amt { color: var(--on-tab); }
+.kid .jar-label { color: rgba(255, 255, 255, .9); }
+
+.kid .dream-card { background: #fff; box-shadow: var(--shadow); border-radius: 32px; }
+.kid .dream-card.empty { background: var(--glass); border: 3px dashed rgba(255, 255, 255, .7); box-shadow: none; color: var(--on-tab); }
+.kid .dream-card.empty small { color: rgba(255, 255, 255, .9); }
+.bar { background: color-mix(in srgb, var(--accent) 12%, #fff); }
+.bar i { background: linear-gradient(90deg, var(--tab-2, var(--accent-2)), var(--accent)); }
+
+/* заголовки секцій і перемикачі */
+.kid .sec { color: var(--on-tab); }
+.kid .sec .pill, .kid .pill { background: var(--glass); color: var(--on-tab); }
+.kid .daypart { background: var(--glass); box-shadow: none; border-radius: 999px; }
+.kid .daypart button { border-radius: 999px; }
+.kid .daypart button { color: rgba(255, 255, 255, .9); }
+.kid .daypart button.on { background: #fff; color: var(--accent); }
+.kid .hearts-bar { background: var(--glass); box-shadow: none; }
+.kid .empty-note { color: rgba(255, 255, 255, .9); }
+
+/* картки справ — білі, без рамок */
+.kid .task { background: #fff; border-radius: 30px; box-shadow: var(--shadow); }
+.kid .task .t-icon { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .12)); }
+.kid .task.done { background: rgba(255, 255, 255, .55); opacity: 1; box-shadow: none; }
+.kid .task.done .t-title, .kid .task.done .t-icon { opacity: .6; }
+.kid .task.wait { background: #fff8d9; }
+.kid .t-badge { box-shadow: 0 4px 10px rgba(0, 0, 0, .12); }
+.kid .car-arrow { background: #fff; color: var(--accent); box-shadow: var(--shadow); border: 0; }
+
+/* мрії */
+.kid .wish { background: #fff; border-radius: 30px; box-shadow: var(--shadow); }
+.kid .wish.add { background: var(--glass); border: 3px dashed rgba(255, 255, 255, .7); color: var(--on-tab); }
+.kid .wish.add .big { color: #fff; }
+.kid .shelf-item { color: var(--on-tab); }
+
+/* успіхи */
+.kid .day, .kid .stat, .kid .streak, .kid .hist { background: #fff; box-shadow: var(--shadow); border-radius: 26px; }
+.kid .day.today { outline: 4px solid #fff; outline-offset: 3px; }
+.kid .day.future { opacity: .55; }
+.kid .album, .kid .sticker-next { color: var(--on-tab); }
+
+/* навігація — біла «таблетка», активна вкладка в її кольорі */
+.kid-nav { background: rgba(255, 255, 255, .96); box-shadow: 0 14px 34px rgba(60, 10, 60, .18); border-radius: 999px; padding: 8px 10px; }
+.nav-btn { border-radius: 999px; }
+.nav-btn.on { background: var(--tab); }
+.nav-btn.on small { color: #fff; }
+.nav-btn .badge { background: var(--tab-deep); color: #fff; }
+
+/* ---------- батьківський режим: світлий, спокійний ---------- */
+html[data-view="parent"] .card, html[data-view="parent"] fieldset { box-shadow: var(--shadow); border-color: transparent; }
+
+/* ---------- онбординг ---------- */
+html[data-view="onboarding"] .ob-title { color: #fff; text-shadow: none; }
+html[data-view="onboarding"] .ob-sub { color: rgba(255, 255, 255, .92); }
+html[data-view="onboarding"] .btn-col .btn:not(.ghost) { background: #fff; color: var(--tab-deep); }
+html[data-view="onboarding"] .btn-col .btn.ghost { background: transparent; color: #fff; border: 2px solid rgba(255, 255, 255, .85); }
+html[data-view="onboarding"] .card { box-shadow: 0 20px 50px rgba(80, 10, 60, .18); border-radius: 34px; }
+
+/* ---------- вікна ---------- */
+.modal-card { border-radius: 34px; }
+.modal-back { background: rgba(40, 15, 50, .35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.x { background: #f4eef6; }
+
+/* шапка: один компаньйон (тап — обрати іншого) */
+.kid-top { grid-template-columns: 100px 1fr auto; }
+.kid-top .mascot { width: 100px; height: 100px; }
+.kid-top .mascot img { width: 100%; height: 100%; object-fit: contain; }
+@media (max-width: 600px) {
+  .kid-top { grid-template-columns: 60px 1fr auto; gap: 10px; }
+  .kid-top .mascot { width: 60px; height: 60px; }
+  .comp-grid.big { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .comp-grid.big .comp-pic { height: 110px; }
+}
