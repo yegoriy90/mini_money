@@ -558,3 +558,10 @@ legend + * { clear: both; }
 .legacy-box { margin-top: 14px; padding: 12px; border: 2px dashed rgba(0,0,0,.15); border-radius: 16px; }
 .legacy-box p { margin: 0 0 6px; }
 .legacy-box b { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; }
+
+/* нагадування (нативний застосунок) */
+.remind-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
+.remind-row .check { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+.remind-row .check input { width: 24px; height: 24px; accent-color: var(--accent); }
+.remind-row input[type=time] { font: inherit; font-size: 18px; font-weight: 700; padding: 8px 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); }
+.remind-row input[type=time]:disabled { opacity: .45; }

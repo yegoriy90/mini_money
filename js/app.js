@@ -6,6 +6,7 @@ import {
 import { openStore, cloudAvailable, createCloudFamily, migrateToCloud, joinFamily } from './store.js';
 import { THEMES, theme, themeId } from './themes.js';
 import { speak, say, setVoice, sound, confetti } from './fx.js';
+import { isNative, pickPhoto, REMINDERS, getReminders, setReminders, applyReminders } from './native.js';
 
 const $app = document.getElementById('app');
 const $modal = document.getElementById('modal');
@@ -76,6 +77,7 @@ function onData(state) {
   else if (S.seenFamily && state.family === null && state.members) { S.seenFamily = false; return noAccess(); }
   S.data = { ...state, settings: state.settings ? withDefaults(state.settings) : null, rawSettings: state.settings };
   S.error = null;
+  if (isNative && state.settings && !S.remindSynced) { S.remindSynced = true; applyReminders(getReminders(), remindCtx()).catch(() => {}); }
   if (state.settings && state.settings.heartsSince == null && !S.migratingHearts) {
     S.migratingHearts = true;
     db([{ op: 'update', col: 'meta', id: 'settings', data: { heartsSince: Date.now() } }]);
@@ -552,6 +554,7 @@ function pSettings() {
   </fieldset>
   <fieldset><legend>Цей пристрій</legend>
     ${seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"')}
+    ${isNative ? remindBlock() : ''}
     <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати цей пристрій</button><button class="btn no" data-a="delete-family">🗑 Видалити сім'ю й усі дані</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
     ${cloud ? `<p class="hint">«Видалити сім'ю» назавжди стирає з хмари всі справи, мрії, монетки й налаштування та від'єднує всі пристрої.</p>` : ''}
   </fieldset>
@@ -561,6 +564,18 @@ function pSettings() {
 
 // ---------- ВІКНА ----------
 // Синхронізація: пристрої сім'ї, запрошення, старий код
+// нагадування — налаштування лише цього пристрою
+function remindCtx() { return { role: S.device?.role, name: S.data?.settings?.childName || '' }; }
+function remindBlock() {
+  const r = getReminders();
+  return `<div class="f">Нагадування на цьому пристрої</div>
+    ${REMINDERS.map(x => `<div class="remind-row">
+      <label class="check"><input type="checkbox" data-a="remind-toggle" data-k="${x.key}"${r[x.key] ? ' checked' : ''}> ${x.label}</label>
+      <input type="time" data-a="remind-time" data-k="${x.key}" value="${r[x.key] || x.def}"${r[x.key] ? '' : ' disabled'}>
+    </div>`).join('')}
+    <p class="hint">${S.device?.role === 'parent' ? 'Телефон нагадає перевірити справи.' : 'iPad щодня нагадає про звички.'} Сповіщення приходять, навіть коли застосунок закритий.</p>`;
+}
+
 function syncBlock() {
   const fam = S.data?.family, members = S.data?.members, me = S.data?.uid;
   const oldCode = `${S.device.fid.slice(0, 5)}-${S.device.fid.slice(5)}`;
@@ -939,9 +954,25 @@ const A = {
     if (!confirm('Скасувати цей запис? Баланс зміниться.')) return;
     await db([{ op: 'delete', col: 'ledger', id: el.dataset.id }]);
   },
+  async 'remind-toggle'(el) {
+    const r = getReminders(), k = el.dataset.k, time = $app.querySelector(`[data-a="remind-time"][data-k="${k}"]`);
+    if (el.checked) r[k] = time?.value || REMINDERS.find(x => x.key === k).def; else delete r[k];
+    if (time) time.disabled = !el.checked;
+    const ok = await setReminders(r, remindCtx()).catch(() => false);
+    if (!ok) { el.checked = false; if (time) time.disabled = true; delete r[k]; await setReminders(r, remindCtx()).catch(() => {}); return toast('Дозвольте сповіщення: Параметри → Mini Money → Сповіщення'); }
+    if (el.checked) toast(`⏰ Нагадаю о ${r[k]}`);
+  },
+  async 'remind-time'(el) {
+    const r = getReminders(), k = el.dataset.k;
+    if (!r[k] || !el.value) return;
+    r[k] = el.value;
+    await setReminders(r, remindCtx()).catch(() => {});
+    toast(`⏰ Нагадаю о ${r[k]}`);
+  },
   async 'set-role'(el) {
     S.device = { ...S.device, role: el.value }; LS.set('mm.device', S.device); S.parent = false; S.preview = false; render();
     S.store?.updateMe?.({ role: el.value }).catch(() => {});
+    if (isNative) applyReminders(getReminders(), remindCtx()).catch(() => {});
   },
   async invite() {
     try {
@@ -1224,7 +1255,21 @@ async function obCreate() {
 
 // ---------- ПОДІЇ ----------
 let swallowUntil = 0; // клік від відпускання пальця після утримання 🔒 не має закрити PIN
+async function setWishPhoto(file) {
+  try {
+    M.photo = await resizeImage(file);
+    $modal.querySelector('.photo-prev').innerHTML = `<img src="${M.photo}" alt="">`;
+    $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.remove('on'));
+    sound.done();
+  } catch { toast('Не вдалося відкрити фото'); }
+}
 document.addEventListener('click', e => {
+  // у нативному застосунку — системна камера/фото замість вебвибору файлу
+  if (isNative && e.target.closest('#photoPick')) {
+    e.preventDefault();
+    pickPhoto().then(b => b && setWishPhoto(b), () => toast('Не вдалося відкрити камеру — перевірте дозвіл у Параметрах'));
+    return;
+  }
   const el = e.target.closest('[data-a]');
   if (!el || el.tagName === 'INPUT') return;
   if (Date.now() < swallowUntil && el.classList.contains('modal-back')) return;
@@ -1235,14 +1280,7 @@ document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
   if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
-  if (el.dataset.change === 'photo' && el.files?.[0]) {
-    try {
-      M.photo = await resizeImage(el.files[0]);
-      $modal.querySelector('.photo-prev').innerHTML = `<img src="${M.photo}" alt="">`;
-      $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.remove('on'));
-      sound.done();
-    } catch { toast('Не вдалося відкрити фото'); }
-  }
+  if (el.dataset.change === 'photo' && el.files?.[0]) setWishPhoto(el.files[0]);
 });
 document.addEventListener('input', e => {
   if (e.target.dataset.input === 'emoji') {

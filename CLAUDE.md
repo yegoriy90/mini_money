@@ -3,7 +3,7 @@
 Відповідай українською, неформально. Для Мії (5 років) — пізніше інші вікові групи.
 
 ## Структура
-- `index.html` — оболонка; `?v=` у підключеннях `css/app.css` і `js/app.js` + `VERSION` у `sw.js` піднімати при кожній зміні.
+- `index.html` — оболонка; при кожній зміні піднімати разом: `?v=` у `index.html`, `window.MM_VERSION` там же, `VERSION` і `?v=` у списку `SHELL` у `sw.js` (нові js-файли — теж у `SHELL`).
 - `js/app.js` — UI: онбординг, дитячий екран (справи / мрії / успіхи), батьківський режим (PIN), вікна, дії (`A`), форми.
 - `js/model.js` — логіка: гроші в **копійках**, баланс = сума `ledger`; `splitReward` (розподіл по скарбничках за «недобором», без зменшень), серії, `approveOps`/`buyOps`.
 - `js/store.js` — `LocalStore` (localStorage, fid `local`) і `CloudStore` (Firestore `families/{fid}/{meta|tasks|wishes|completions|ledger}`), однаковий API `watch/batch`. `migrateToCloud`.
@@ -31,4 +31,5 @@
 - Нативна обгортка: Capacitor 8 (`capacitor.config.json`, appId `ua.minimoney.app`, папка `ios/`, SPM). `npm run build:www` збирає `www/` (Firebase SDK локально в `www/vendor/firebase`, бо в нативі `location.protocol === 'capacitor:'`), `npm run ios:sync` → Xcode на Mac.
 - `privacy.html` і `support.html` (uk + en, стиль `css/page.css`) — для App Store: https://yegoriy90.github.io/mini_money/privacy.html, …/support.html. Посилання — внизу батьківських налаштувань (за PIN = батьківський бар'єр; у нативі — повна адреса, `SITE` в app.js). Контакт поки — GitHub Issues (публічні), краще окрема пошта. При зміні збору даних — оновлювати політику й дату.
 - Шрифт Nunito локально (`css/fonts.css`, `assets/fonts/`, OFL) — жодних запитів до Google Fonts (дитяча категорія: без сторонніх запитів, крім Firebase при синхронізації).
-- Ще треба: локальні сповіщення, haptics, нативна камера; Sign in with Apple (не обов'язково — немає стороннього входу); скриншоти й опис; перевірити комерційну ліцензію Magnific на голос/картинки.
+- Нативне (`js/native.js`, у браузері — нічого не робить): haptics на звуках (`sound.*` у fx.js), нагадування про звички — локальні сповіщення, налаштування лише пристрою (`mm.remind` у localStorage, «Цей пристрій» у налаштуваннях), фото мрії — плагін Camera (у `Info.plist` описи дозволів камери/фото). Тестова збірка в локальному режимі: після `build:www` замінити `www/js/firebase-config.js` на `null` + `npx cap copy ios`.
+- Ще треба: Sign in with Apple (не обов'язково — немає стороннього входу); скриншоти й опис; перевірити комерційну ліцензію Magnific на голос/картинки.

@@ -1,4 +1,5 @@
 // Голос, звуки й святкування.
+import { haptic } from './native.js';
 
 let voice = null;
 function pickVoice() {
@@ -79,10 +80,11 @@ function tone(freq, start, dur, type = 'sine', vol = 0.18) {
 }
 
 export const sound = {
-  tap() { tone(660, 0, 0.08, 'triangle', 0.08); },
-  coin() { tone(988, 0, 0.12, 'square', 0.06); tone(1319, 0.08, 0.35, 'square', 0.06); },
-  done() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.09, 0.25, 'triangle', 0.12)); },
+  tap() { haptic.tap(); tone(660, 0, 0.08, 'triangle', 0.08); },
+  coin() { haptic.coin(); tone(988, 0, 0.12, 'square', 0.06); tone(1319, 0.08, 0.35, 'square', 0.06); },
+  done() { haptic.success(); [523, 659, 784].forEach((f, i) => tone(f, i * 0.09, 0.25, 'triangle', 0.12)); },
   fanfare() {
+    haptic.big();
     [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.3, 'triangle', 0.14));
     tone(1319, 0.5, 0.6, 'triangle', 0.12);
     for (let i = 0; i < 6; i++) { tone(988, 0.8 + i * 0.12, 0.1, 'square', 0.04); tone(1319, 0.86 + i * 0.12, 0.2, 'square', 0.04); }
