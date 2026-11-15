@@ -2,7 +2,6 @@
 // Флопі й Мусі — за улюбленими іграшками Мії; решта — власні оригінальні плюшеві герої (Magnific).
 // Картинки: assets/heroes/<img>.webp (повний зріст) і <img>-avatar.webp (квадратний аватар з усією головою — tools/make_avatars.py), прозорий фон.
 
-const emoji = e => `<span class="emoji-mascot" aria-hidden="true">${e}</span>`;
 const img = (src, cls = '') => `<img class="hero-img ${cls}" src="${src}" alt="" draggable="false">`;
 
 // Друзі ростуть разом з дитиною: age — вікова група (AGE_GROUPS у library.js).
@@ -70,7 +69,8 @@ export function theme(id) {
     ...c,
     title: c.name, preview: heroHead(c),
     mascots: [heroHead(c)], full: [heroFull(c)],
-    jarArt: { spend: emoji('🛍️'), save: heroHead(c), give: emoji('💝') },
+    // скарбнички — у стилі вікової групи друга: assets/jars/<вік>-<скарбничка>.webp
+    jarArt: Object.fromEntries(['spend', 'save', 'give'].map(j => [j, `<img class="jar-img" src="assets/jars/${c.age}-${j}.webp" alt="" draggable="false">`])),
     // відео святкування є лише з Флопі й Мусі
     celeVideo: c.id === 'flopi' || c.id === 'musi' ? 'assets/cele-heroes.mp4' : null,
   };

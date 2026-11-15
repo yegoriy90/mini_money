@@ -68,6 +68,10 @@ h1 .hero-img.head { width: 1.3em; height: 1.3em; object-fit: cover; object-posit
 .jar-art { inset: 0; display: grid; place-items: center; }
 .jar-art .emoji-mascot { font-size: 32px; }
 .jar-art:has(.head) { inset: 0; width: 100%; height: 100%; transform: none; box-shadow: none; }
+.jar-glass:has(.jar-img) { width: 88px; background: none; border-radius: 0; overflow: visible; }
+.jar-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .14)); pointer-events: none; }
+@media (max-width: 600px) { .jar-glass:has(.jar-img) { width: 64px; } }
+.mv-art .jar-img { width: 100%; height: 100%; }
 .jar-amt { font-size: 22px; font-weight: 700; gap: 5px; color: var(--ink); }
 .jar-amt .coin { font-size: 18px; }
 .jar-label { font-size: 13px; font-weight: 600; color: var(--muted); }
