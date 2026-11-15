@@ -1135,8 +1135,10 @@ async function onSubmit(form) {
   if (kind === 'ob-join') {
     const role = f.get('role');
     let fid;
+    const btn = form.querySelector('[type=submit]'), label = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Зачекайте…'; }
     try { fid = await joinFamily(f.get('code') || '', { role }); }
-    catch (e) { return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = label; } return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
     S.device = { fid, role }; LS.set('mm.device', S.device);
     S.noAccess = false;
     connect();

@@ -1,5 +1,5 @@
 // Офлайн-кеш оболонки застосунку. При зміні файлів — підняти VERSION.
-const VERSION = 'mm-v20';
+const VERSION = 'mm-v21';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/fonts.css?v=20', 'css/app.css?v=20', 'js/app.js?v=20', 'assets/fonts/nunito-cyrillic.woff2', 'assets/fonts/nunito-latin.woff2',
   'js/model.js', 'js/store.js', 'js/library.js', 'js/themes.js', 'js/fx.js', 'js/firebase-config.js', 'audio/voice/index.js',
