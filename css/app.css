@@ -539,7 +539,7 @@ legend + * { clear: both; }
 .rep-st { font-size: 20px; min-width: 28px; justify-content: center; }
 .row.rejected .r-main { text-decoration: line-through; }
 
-/* герої-фото (Флопі й Мавпочка) */
+/* герої-фото (Флопі й Мусі) */
 .hero-img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-user-drag: none; filter: drop-shadow(0 6px 6px rgba(120, 60, 110, .18)); }
 .jar-art .hero-img { filter: none; }
 .kid-top .mascot { height: 92px; }
