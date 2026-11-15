@@ -1,10 +1,10 @@
-// Теми оформлення. Головні герої — Флопі й Мавпочка (за улюбленими іграшками Мії, згенеровані 3D-фото).
+// Теми оформлення. Головні герої — Флопі й Мусі (за улюбленими іграшками Мії, згенеровані 3D-фото).
 
 const emoji = e => `<span class="emoji-mascot" aria-hidden="true">${e}</span>`;
 const img = (src, cls = '') => `<img class="hero-img ${cls}" src="${src}" alt="" draggable="false">`;
 
 // Імена героїв — в одному місці, щоб легко перейменувати
-export const HEROES = { bunny: 'Флопі', monkey: 'Мавпочка' };
+export const HEROES = { bunny: 'Флопі', monkey: 'Мусі' };
 const FLOPI = img('assets/heroes/flopi.webp', 'bunny'), MONKEY = img('assets/heroes/monkey.webp', 'monkey');
 const FLOPI_HEAD = img('assets/heroes/flopi-head.webp', 'bunny head'), MONKEY_HEAD = img('assets/heroes/monkey-head.webp', 'monkey head');
 
