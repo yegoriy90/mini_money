@@ -35,6 +35,9 @@ const isF = () => st().gender !== 'm';
 const isParentView = () => !!S.device && (S.parent || (S.device.role === 'parent' && !S.preview));
 const wishJar = w => (st().jarsEnabled ? (w.jar || 'save') : 'spend');
 
+// сторінки конфіденційності й підтримки (у нативному застосунку — повна адреса сайту)
+const SITE = location.protocol === 'capacitor:' ? 'https://yegoriy90.github.io/mini_money/' : '';
+
 // ---------- запуск ----------
 async function connect() {
   if (S.unwatch) S.unwatch();
@@ -552,6 +555,7 @@ function pSettings() {
     <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати цей пристрій</button><button class="btn no" data-a="delete-family">🗑 Видалити сім'ю й усі дані</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
     ${cloud ? `<p class="hint">«Видалити сім'ю» назавжди стирає з хмари всі справи, мрії, монетки й налаштування та від'єднує всі пристрої.</p>` : ''}
   </fieldset>
+  <p class="hint center"><a href="${SITE}privacy.html" target="_blank" rel="noopener">Конфіденційність</a> · <a href="${SITE}support.html" target="_blank" rel="noopener">Підтримка</a></p>
   <p class="hint center">Mini Money · v${window.MM_VERSION || ''}</p>`;
 }
 

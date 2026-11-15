@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..'), out = path.join(root, 'www');
 fs.rmSync(out, { recursive: true, force: true });
 const copy = rel => fs.cpSync(path.join(root, rel), path.join(out, rel), { recursive: true });
-['index.html', 'manifest.webmanifest', 'css', 'js', 'audio', 'assets', 'icons'].forEach(copy);
+['index.html', 'privacy.html', 'support.html', 'manifest.webmanifest', 'css', 'js', 'audio', 'assets', 'icons'].forEach(copy);
 // Firebase: CDN-збірки з npm, абсолютні імпорти gstatic → локальні
 const FB_VER = '10.12.2';
 const vend = path.join(out, 'vendor', 'firebase');
