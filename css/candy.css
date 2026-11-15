@@ -150,3 +150,70 @@ html[data-view="onboarding"] .card { box-shadow: 0 20px 50px rgba(80, 10, 60, .1
 /* у скарбничці — коло по центру скла */
 .jar-art:has(.head) { inset: auto; left: 50%; top: 50%; width: 68%; aspect-ratio: 1; height: auto; transform: translate(-50%, -46%); box-shadow: 0 0 0 3px rgba(255, 255, 255, .8); }
 h1 .hero-img.head { width: 1.4em; height: 1.4em; object-fit: cover; object-position: 50% 0; }
+
+/* ---------- Liquid Glass (v27) ----------
+   Дитячий екран: замість білих карток — напівпрозоре скло з розмиттям, відблиском і світлою обвідкою.
+   Вікна й батьківський режим лишаються білими (читабельність форм). */
+:root {
+  --lg-fill: linear-gradient(150deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, .16) 55%, rgba(255, 255, 255, .24) 100%);
+  --lg-edge: rgba(255, 255, 255, .55);
+  --lg-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .22),
+    inset 0 0 22px rgba(255, 255, 255, .12), 0 12px 30px rgba(40, 10, 70, .14);
+  --lg-blur: blur(22px) saturate(170%);
+}
+.kid .task, .kid .dream-card:not(.empty), .kid .wish:not(.add), .kid .day, .kid .stat, .kid .streak, .kid .hist,
+.kid .total-pill, .kid .car-arrow, .kid .hearts-bar, .kid .daypart, .kid .jar, .kid-nav {
+  background: var(--lg-fill);
+  border: 1px solid var(--lg-edge);
+  box-shadow: var(--lg-shadow);
+  backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+  color: #fff;
+}
+/* текст на склі — білий з легкою тінню */
+.kid .task .t-title, .kid .dream-info b, .kid .dream-left, .kid .wish-body b, .kid .stat > b, .kid .streak b,
+.kid .day small, .kid .h-note, .kid .h-row b, .kid .total-pill b, .kid .stars b {
+  color: #fff; text-shadow: 0 1px 2px rgba(40, 10, 70, .18);
+}
+.kid .dream-card small, .kid .dream-info small, .kid .wish-state, .kid .stat small, .kid .streak small,
+.kid .h-note small, .kid .stars, .kid .dream-info .wish-have small { color: rgba(255, 255, 255, .86); }
+.kid .plus { color: #eafff3; } .kid .minus { color: #ffe3e3; }
+.kid .h-row { border-color: rgba(255, 255, 255, .25); }
+.kid .task .t-icon, .kid .wish .wish-pic { filter: drop-shadow(0 8px 12px rgba(40, 10, 70, .18)); }
+/* стани справ */
+.kid .task.done { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5); }
+.kid .task.done .t-title, .kid .task.done .t-icon { opacity: .55; }
+.kid .task.wait { background: linear-gradient(150deg, rgba(255, 236, 150, .55), rgba(255, 210, 90, .22)); }
+/* прогрес мрії — біла смужка на склі */
+.kid .bar { background: rgba(255, 255, 255, .25); box-shadow: inset 0 1px 2px rgba(40, 10, 70, .12); }
+.kid .bar i { background: linear-gradient(90deg, rgba(255, 255, 255, .75), #fff); box-shadow: 0 0 10px rgba(255, 255, 255, .6); }
+.kid .wish-pic { background: rgba(255, 255, 255, .22); }
+.kid .pz-grid i { background: rgba(255, 255, 255, .28); }
+/* перемикачі й навігація: активний пункт — щільніше скло */
+.kid .daypart { padding: 5px; }
+.kid .daypart button.on, .nav-btn.on {
+  background: rgba(255, 255, 255, .62); color: var(--tab-deep);
+  box-shadow: inset 0 1px 0 #fff, 0 4px 12px rgba(40, 10, 70, .12);
+}
+.nav-btn small { color: rgba(255, 255, 255, .92); }
+.nav-btn.on small { color: var(--tab-deep); }
+.kid-nav { box-shadow: var(--lg-shadow), 0 18px 40px rgba(40, 10, 70, .22); }
+.kid .car-arrow { color: #fff; }
+.kid .t-badge.wait { background: rgba(255, 244, 200, .9); }
+.kid .day.today { outline-color: rgba(255, 255, 255, .9); }
+/* скарбнички: внутрішнє «скло» трохи світліше */
+.kid .jar-glass { background: rgba(255, 255, 255, .28); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8); }
+/* контраст білого тексту на світлих темах (Лео, Пінго): тінь кольору компаньйона */
+.kid .task .t-title, .kid .dream-info b, .kid .dream-left, .kid .wish-body b, .kid .stat > b, .kid .streak b,
+.kid .day small, .kid .h-note, .kid .h-row b, .kid .total-pill b, .kid .stars b, .kid .jar-amt, .kid .jar-label,
+.kid .hello h1, .kid .hello .sub, .kid .sec, .nav-btn small, .kid .daypart button, .kid .wish-state, .kid .dream-card small {
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--tab-deep) 70%, transparent);
+}
+.nav-btn.on small, .kid .daypart button.on { text-shadow: none; }
+/* альбом наліпок на склі: закриті — білі силуети */
+.kid .album { background: var(--lg-fill); border: 1px solid var(--lg-edge); box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur); }
+.kid .sticker { background: rgba(255, 255, 255, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45); }
+.kid .sticker img { filter: brightness(0) invert(1) opacity(.45); }
+.kid .sticker.got { background: rgba(255, 255, 255, .5); }
+.kid .sticker.got img { filter: drop-shadow(0 4px 4px rgba(40, 10, 70, .2)); }
+.kid .sticker-next { color: rgba(255, 255, 255, .92); }
+.kid .wish-have, .kid .wish-have small { color: rgba(255, 255, 255, .92); text-shadow: 0 1px 3px color-mix(in srgb, var(--tab-deep) 70%, transparent); }
