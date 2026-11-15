@@ -1,9 +1,9 @@
 // Офлайн-кеш оболонки застосунку. При зміні файлів — підняти VERSION.
-const VERSION = 'mm-v15';
+const VERSION = 'mm-v16';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=15', 'js/app.js?v=15',
+  './', 'index.html', 'manifest.webmanifest', 'css/app.css?v=16', 'js/app.js?v=16',
   'js/model.js', 'js/store.js', 'js/library.js', 'js/themes.js', 'js/fx.js', 'js/firebase-config.js', 'audio/voice/index.js',
-  'icons/icon.svg', 'assets/cele-kitty.mp4', 'assets/cele-kitty.jpg', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
+  'icons/icon.svg', 'assets/heroes/flopi.webp', 'assets/heroes/monkey.webp', 'assets/heroes/flopi-head.webp', 'assets/heroes/monkey-head.webp', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
 ];
 
 self.addEventListener('install', e => {

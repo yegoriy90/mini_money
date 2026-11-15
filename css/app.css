@@ -1,5 +1,5 @@
 /* ---------- теми ---------- */
-:root, [data-theme="kitty"] {
+:root, [data-theme="toys"] {
   --bg: #fff0f6;
   --bg-dots: #ffd6e8;
   --card: #ffffff;
@@ -302,7 +302,7 @@ h1, h2, h3 { margin: 0; }
 .theme-pick span { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; border-radius: 18px; border: 3px solid var(--line); font-weight: 800; cursor: pointer; }
 .theme-pick em { font-style: normal; font-size: 34px; }
 .theme-pick input:checked + span { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
-.t-kitty span { background: #fff0f6; color: #3a2340; }
+.t-toys span { background: #fff0f6; color: #3a2340; }
 .t-space span { background: #1d2763; color: #fff; }
 .t-forest span { background: #eef8e8; color: #23402c; }
 
@@ -538,3 +538,12 @@ legend + * { clear: both; }
 .rep-day small { color: var(--muted); font-weight: 800; }
 .rep-st { font-size: 20px; min-width: 28px; justify-content: center; }
 .row.rejected .r-main { text-decoration: line-through; }
+
+/* герої-фото (Флопі й Мавпочка) */
+.hero-img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-user-drag: none; filter: drop-shadow(0 6px 6px rgba(120, 60, 110, .18)); }
+.jar-art .hero-img { filter: none; }
+.kid-top .mascot { height: 92px; }
+.cele-mascots .mascot { width: 150px; height: 170px; }
+.ob-mascots .mascot { width: 170px; height: 210px; }
+.ob-mascots .mascot:first-child { height: 160px; align-self: flex-end; }
+.ob-mascots { align-items: flex-end; }

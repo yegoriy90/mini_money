@@ -4,7 +4,7 @@ import {
   balances, total, taskState, currentStreak, approveOps, buyOps, cashOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
 import { openStore, cloudAvailable, createCloudFamily, cloudFamilyExists, migrateToCloud } from './store.js';
-import { THEMES, theme } from './themes.js';
+import { THEMES, theme, themeId } from './themes.js';
 import { speak, say, setVoice, sound, confetti } from './fx.js';
 
 const $app = document.getElementById('app');
@@ -81,7 +81,7 @@ function render() {
   if (S.error && !S.data) { $app.innerHTML = `<div class="center-screen"><div class="card pad"><p>${esc(S.error)}</p><button class="btn" data-a="retry">Спробувати ще</button> <button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button></div></div>`; return; }
   if (!S.data?.ready) { $app.innerHTML = `<div class="center-screen"><div class="loader">🪙</div></div>`; return; }
   if (!S.data.rawSettings) { S.device = null; LS.del('mm.device'); return renderOnboarding(); }
-  document.documentElement.dataset.theme = st().theme;
+  document.documentElement.dataset.theme = themeId(st().theme);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme(st().theme).color);
   // зберегти прокрутку каруселей між перемальовуваннями
   const keep = {};
@@ -485,7 +485,7 @@ function pSettings() {
       <div class="f">Вік (набір завдань у бібліотеці)</div>${seg('ageGroup', s.ageGroup, AGE_GROUPS.map(a => [a.id, a.title]))}
     </fieldset>
     <fieldset><legend>Оформлення</legend>
-      <div class="themes">${Object.entries(THEMES).map(([id, t]) => `<label class="theme-pick t-${id}"><input type="radio" name="theme" value="${id}" ${s.theme === id ? 'checked' : ''}><span><em>${t.preview}</em>${t.title}</span></label>`).join('')}</div>
+      <div class="themes">${Object.entries(THEMES).map(([id, t]) => `<label class="theme-pick t-${id}"><input type="radio" name="theme" value="${id}" ${themeId(s.theme) === id ? 'checked' : ''}><span><em>${t.preview}</em>${t.title}</span></label>`).join('')}</div>
     </fieldset>
     <fieldset><legend>Гроші</legend>
       ${seg('currency', s.currency, [['coins', '🪙 Монетки'], ['uah', '₴ Гривні']])}
@@ -721,7 +721,7 @@ function checkCelebrate() {
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
       ${th.celeVideo ? `<video class="cele-video" src="${th.celeVideo}" poster="${th.celeVideo.replace('.mp4', '.jpg')}" autoplay loop muted playsinline></video>`
-        : `<div class="cele-mascots"><div class="mascot">${th.mascots[0]}</div><i class="cele-coin">${sum ? coinIcon() : '❤️'}</i><div class="mascot">${th.mascots[1]}</div></div>`}
+        : `<div class="cele-mascots"><div class="mascot">${(th.full || th.mascots)[0]}</div><i class="cele-coin">${sum ? coinIcon() : '❤️'}</i><div class="mascot">${(th.full || th.mascots)[1]}</div></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
@@ -1056,11 +1056,11 @@ async function onSubmit(form) {
 
 // ---------- ОНБОРДИНГ ----------
 function renderOnboarding() {
-  document.documentElement.dataset.theme = 'kitty';
-  const th = THEMES.kitty, o = S.ob;
+  document.documentElement.dataset.theme = 'toys';
+  const th = THEMES.toys, o = S.ob;
   if (o.step === 'welcome') {
     $app.innerHTML = `<div class="center-screen ob">
-      <div class="ob-mascots"><div class="mascot">${th.mascots[0]}</div><div class="mascot">${th.mascots[1]}</div></div>
+      <div class="ob-mascots"><div class="mascot">${(th.full || th.mascots)[0]}</div><div class="mascot">${(th.full || th.mascots)[1]}</div></div>
       <h1 class="ob-title">Mini Money</h1>
       <p class="ob-sub">Скарбничка для маленьких помічників: справи → монетки → мрії</p>
       <div class="btn-col">
@@ -1110,7 +1110,7 @@ async function obCreate() {
   const coinValue = DEFAULT_SETTINGS.coinValue;
   const settings = {
     ...DEFAULT_SETTINGS, childName: v.childName.trim(), childVoc: (v.childVoc || '').trim() || vocative(v.childName),
-    gender: v.gender, ageGroup: v.ageGroup, theme: AGE_GROUPS.find(a => a.id === v.ageGroup)?.theme || 'kitty',
+    gender: v.gender, ageGroup: v.ageGroup, theme: AGE_GROUPS.find(a => a.id === v.ageGroup)?.theme || 'toys',
     pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(), matchSince: Date.now(), heartsSince: Date.now(),
   };
   const now = Date.now();

@@ -14,5 +14,5 @@ for (const f of ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js']
   fs.writeFileSync(path.join(vend, f), src.split(`https://www.gstatic.com/firebasejs/${FB_VER}/`).join('./'));
 }
 // без service worker у нативі (там він не потрібен і не працює на capacitor://)
-fs.rmSync(path.join(out, 'assets', 'mascots-frame.png'), { force: true });
+
 console.log('www готово:', fs.readdirSync(out).join(', '));
