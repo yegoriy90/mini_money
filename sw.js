@@ -1,7 +1,7 @@
 // Офлайн-кеш оболонки застосунку. При зміні файлів — підняти VERSION.
-const VERSION = 'mm-v28';
+const VERSION = 'mm-v29';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/fonts.css?v=28', 'css/app.css?v=28', 'css/candy.css?v=28', 'js/app.js?v=28', 'assets/fonts/nunito-cyrillic.woff2', 'assets/fonts/nunito-latin.woff2',
+  './', 'index.html', 'manifest.webmanifest', 'css/fonts.css?v=29', 'css/app.css?v=29', 'css/candy.css?v=29', 'js/app.js?v=29', 'assets/fonts/nunito-cyrillic.woff2', 'assets/fonts/nunito-latin.woff2',
   'js/model.js', 'js/store.js', 'js/library.js', 'js/themes.js', 'js/fx.js', 'js/native.js', 'js/firebase-config.js', 'audio/voice/index.js',
   'icons/favicon.png', 'assets/cele-heroes.mp4', 'assets/cele-heroes.jpg', 'assets/heroes/flopi.webp', 'assets/heroes/monkey.webp', 'assets/heroes/flopi-avatar.webp', 'assets/heroes/monkey-avatar.webp', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
 ];

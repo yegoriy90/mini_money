@@ -794,7 +794,7 @@ function checkCelebrate() {
   setTimeout(() => {
     openModal(`<div class="cele" data-a="close">
       ${th.celeVideo ? `<video class="cele-video" src="${th.celeVideo}" poster="${th.celeVideo.replace('.mp4', '.jpg')}" autoplay loop muted playsinline></video>`
-        : `<div class="cele-mascots"><div class="mascot">${(th.full || th.mascots)[0]}</div><i class="cele-coin">${sum ? coinIcon() : '❤️'}</i><div class="mascot">${(th.full || th.mascots)[1]}</div></div>`}
+        : `<div class="cele-hero"><div class="cele-glow"></div>${th.full[0]}<i class="cele-coin">${sum ? coinIcon() : '❤️'}</i></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
