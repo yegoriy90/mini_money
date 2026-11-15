@@ -1,219 +1,231 @@
-/* ---------- «Candy»: сучасний яскравий мінімалізм (v24) ----------
-   Колір теми — від обраного компаньйона (themes.js → applyColors: --tab, --tab-2, --tab-deep на <html>).
-   Дитячий екран і онбординг — суцільний колір, герой на «склі», білі картки без рамок, кнопки-«таблетки».
-   Батьківський режим — світлий, з акцентом кольору компаньйона. html[data-view]: tasks / dreams / progress / parent / onboarding. */
+/* ---------- Оформлення в дусі iOS (v28) ----------
+   Принципи: світлий фон, ледь тонований кольором друга; білі картки з однаковими радіусами
+   й ледь помітною тінню; колір друга — лише акцент (аватар, прогрес, активна вкладка, кнопки);
+   типографіка за ієрархією iOS (великий заголовок / заголовок / текст / підпис), без тіней під текстом.
+   Колір компаньйона: themes.js → applyColors → --tab, --tab-2, --tab-deep на <html>. */
 
 :root {
   --tab: #a98bf0; --tab-2: #d2c2ff; --tab-deep: #8263e0;
-  --glass: rgba(255, 255, 255, .24);
-  --glass-2: rgba(255, 255, 255, .38);
-  --on-tab: #ffffff;
-  --shadow: 0 10px 28px rgba(70, 20, 80, .10);
-  --line: #f1e4ef;
-  --ink: #2f1d3a;
-  --muted: #8b7a94;
   --accent: var(--tab-deep);
   --accent-2: var(--tab);
+  --accent-ink: #fff;
+  --bg: color-mix(in srgb, var(--tab) 7%, #f5f5f7);
+  --card: #ffffff;
+  --fill: rgba(118, 118, 128, .12);          /* iOS tertiary fill: треки, поля */
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: rgba(60, 60, 67, .12);
+  --tint: color-mix(in srgb, var(--tab) 16%, #fff); /* світлий фон під іконками/аватарами */
+  --r-lg: 22px; --r-md: 16px; --r-sm: 12px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 6px 20px rgba(0, 0, 0, .05);
+  --shadow-up: 0 2px 6px rgba(0, 0, 0, .06), 0 12px 32px rgba(0, 0, 0, .08);
+  --nav: rgba(255, 255, 255, .82);
 }
-html[data-view="tasks"], html[data-view="dreams"], html[data-view="progress"], html[data-view="onboarding"] { background: var(--tab); }
-html[data-view="tasks"] body, html[data-view="dreams"] body, html[data-view="progress"] body, html[data-view="onboarding"] body {
-  background: linear-gradient(170deg, var(--tab-2) 0%, var(--tab) 48%, var(--tab-deep) 140%);
-  min-height: 100dvh;
+html, body { background: var(--bg); }
+body { background-image: none; color: var(--ink); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, b, strong { letter-spacing: -.01em; }
+
+/* ---------- кнопки ---------- */
+.btn { border-radius: 14px; box-shadow: none; font-weight: 600; font-size: 17px; padding: 12px 20px; min-height: 48px; }
+.btn:active:not(:disabled) { transform: scale(.97); box-shadow: none; opacity: .85; }
+.btn.ghost { background: var(--fill); color: var(--ink); border: 0; box-shadow: none; }
+.btn.ok { background: #34c759; box-shadow: none; }
+.btn.no { background: #ff3b30; box-shadow: none; }
+.btn.big { border-radius: 16px; font-size: 18px; min-height: 56px; }
+.btn.round { box-shadow: none; font-weight: 500; }
+.btn.sm { border-radius: 10px; }
+
+/* перемикач у стилі iOS (segmented control) */
+.seg { background: var(--fill); padding: 2px; border-radius: 10px; gap: 0; }
+.seg span { border-radius: 8px; font-weight: 600; font-size: 15px; padding: 8px 12px; color: var(--ink); }
+.seg input:checked + span { background: #fff; color: var(--ink); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
+
+/* ---------- дитячий екран ---------- */
+.kid { padding-top: max(20px, env(safe-area-inset-top)); }
+.kid-top { grid-template-columns: 64px 1fr auto; gap: 14px; margin-bottom: 24px; }
+.kid-top .mascot { width: 64px; height: 64px; animation: none; }
+.hello h1 { font-size: clamp(28px, 3.4vw, 34px); font-weight: 700; color: var(--ink); }
+.hello .sub { font-size: 15px; font-weight: 500; color: var(--muted); }
+.total-pill { background: var(--card); box-shadow: var(--shadow); padding: 8px 16px 8px 10px; font-size: 22px; font-weight: 700; gap: 8px; border-radius: 999px; }
+
+/* аватари друзів — однакові кола на світлому тлі кольору друга */
+.kid-top .mascot, .jar-art:has(.head), .mv-art:has(.head), .comp-grid:not(.big) .comp-pic, h1 .hero-img.head {
+  border-radius: 50%; overflow: hidden; background: var(--tint); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
 }
-html[data-view="parent"] { background: #f7f3f9; }
-html[data-view="parent"] body { background: #f7f3f9; }
+.kid-top .mascot .hero-img.head, .jar-art .hero-img.head, .mv-art .hero-img.head, .comp-grid:not(.big) .comp-pic .hero-img.head {
+  width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; filter: none;
+}
+h1 .hero-img { display: inline-block; vertical-align: middle; filter: none; }
+h1 .hero-img.head { width: 1.3em; height: 1.3em; object-fit: cover; object-position: 50% 0; margin-left: 4px; }
 
-/* ---------- вибір компаньйона ---------- */
-.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 6px 0 4px; }
-.comp-grid.big { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-.comp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border-radius: 24px; background: linear-gradient(170deg, var(--cl), var(--c)); color: #fff; cursor: pointer; transition: transform .12s; }
-.comp:active { transform: scale(.95); }
-.comp input { position: absolute; opacity: 0; pointer-events: none; }
-.comp-pic { position: relative; width: 100%; aspect-ratio: 1; display: block; }
-.comp-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .18)); }
-.comp b { font-size: 15px; font-weight: 900; text-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
-.comp small { font-size: 12px; font-weight: 700; opacity: .9; }
-.comp:has(input:checked), .comp.on { outline: 4px solid var(--c); outline-offset: 3px; box-shadow: 0 0 0 3px #fff inset; }
-.comp:has(input:checked)::after, .comp.on::after { content: "✓"; position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: var(--c); font-weight: 900; display: grid; place-items: center; font-size: 15px; }
-.comp-grid.big .comp-pic { aspect-ratio: auto; height: clamp(130px, 22vh, 190px); }
-.comp-modal { width: min(940px, 100%); }
-.kid-top .mascot.m1 { cursor: pointer; }
-h1 .hero-img { display: inline-block; height: 1.25em; width: auto; vertical-align: middle; filter: none; }
+/* скарбнички: біла картка, кругла іконка, сума */
+.summary { gap: 16px; margin-bottom: 4px; }
+.jars { gap: 12px; }
+.jar { background: var(--card); box-shadow: var(--shadow); border-radius: var(--r-lg); padding: 16px 10px 14px; gap: 8px; }
+.jar:active { transform: scale(.97); }
+.jar-glass { width: 64px; max-width: none; aspect-ratio: 1; border-radius: 50%; border: 0; background: var(--tint); overflow: hidden; }
+.jar-glass::before, .jar-fill { display: none; }
+.jar-art { inset: 0; display: grid; place-items: center; }
+.jar-art .emoji-mascot { font-size: 32px; }
+.jar-art:has(.head) { inset: 0; width: 100%; height: 100%; transform: none; box-shadow: none; }
+.jar-amt { font-size: 22px; font-weight: 700; gap: 5px; color: var(--ink); }
+.jar-amt .coin { font-size: 18px; }
+.jar-label { font-size: 13px; font-weight: 600; color: var(--muted); }
 
-/* ---------- кнопки: плоскі «таблетки» ---------- */
-.btn { border-radius: 999px; box-shadow: none; padding: 12px 22px; }
-.btn:active:not(:disabled) { transform: scale(.96); box-shadow: none; }
-.btn.ghost { background: #fff; border: 2px solid var(--line); box-shadow: none; }
-.btn.ok, .btn.no { box-shadow: none; }
-.btn.big { border-radius: 999px; }
-.btn.round { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+/* мрія */
+.dream-card { background: var(--card); box-shadow: var(--shadow); border-radius: var(--r-lg); padding: 14px; grid-template-columns: 38% 1fr; gap: 16px; }
+.dream-card.empty { background: var(--card); border: 1.5px dashed var(--line); box-shadow: none; gap: 6px; }
+.dream-card.empty .big { font-size: 44px; }
+.dream-card.empty b { font-size: 17px; font-weight: 600; }
+.dream-card small, .dream-info small { color: var(--muted); }
+.dream-info { gap: 8px; }
+.dream-info > small:first-child { font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+.dream-info b { font-size: 20px; font-weight: 700; }
+.dream-left { font-size: 15px; font-weight: 600; color: var(--muted); }
+.puzzle, .wish-pic { border-radius: var(--r-md); }
+.wish-pic { background: var(--tint); }
+.pz-grid { gap: 0; }
+.pz-grid i { background: color-mix(in srgb, var(--tab) 22%, rgba(255, 255, 255, .55)); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, .85); }
+.bar { height: 8px; background: var(--fill); }
+.bar i { background: var(--accent); min-width: 8px; }
+.wish-have { font-size: 15px; font-weight: 600; color: var(--ink); }
+.wish-have small { color: var(--muted); font-weight: 500; }
 
-/* ---------- дитячий екран на кольорі ---------- */
-.kid .hello h1 { color: var(--on-tab); letter-spacing: -.8px; }
-.kid .hello .sub { color: rgba(255, 255, 255, .85); }
-.kid .mascot svg, .kid .mascot img { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .14)); }
-.kid .total-pill { box-shadow: var(--shadow); color: var(--ink); }
+/* заголовки секцій, лічильники, сердечка */
+.sec { font-size: 22px; font-weight: 700; color: var(--ink); margin: 28px 2px 12px; gap: 8px; }
+.sec-row { margin: 28px 2px 12px; }
+.pill { background: var(--fill); color: var(--muted); font-size: 14px; font-weight: 600; padding: 3px 10px; }
+.hearts-bar { background: var(--fill); box-shadow: none; font-size: 18px; padding: 6px 12px; gap: 2px; }
+.hearts-bar span { animation: none; }
+.hearts-bar em { color: var(--muted); font-weight: 500; font-size: 16px; }
+.daypart { background: var(--fill); padding: 2px; border-radius: 10px; box-shadow: none; gap: 0; margin: 0 2px 12px; }
+.daypart button { padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 15px; color: var(--ink); }
+.daypart button.on { background: #fff; color: var(--ink); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
+.empty-note { color: var(--muted); font-weight: 500; }
 
-/* скарбнички — герої на «склі» */
-.kid .jar { background: var(--glass); box-shadow: none; border-radius: 32px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.kid .jar-glass { background: var(--glass-2); border: 0; border-radius: 28px; }
-.kid .jar-glass::before { display: none; }
-.kid .jar-fill { background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .85)); }
-.kid .jar-art img, .kid .jar-art svg { filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .15)); }
-.kid .jar-amt { color: var(--on-tab); }
-.kid .jar-label { color: rgba(255, 255, 255, .9); }
-
-.kid .dream-card { background: #fff; box-shadow: var(--shadow); border-radius: 32px; }
-.kid .dream-card.empty { background: var(--glass); border: 3px dashed rgba(255, 255, 255, .7); box-shadow: none; color: var(--on-tab); }
-.kid .dream-card.empty small { color: rgba(255, 255, 255, .9); }
-.bar { background: color-mix(in srgb, var(--accent) 12%, #fff); }
-.bar i { background: linear-gradient(90deg, var(--tab-2, var(--accent-2)), var(--accent)); }
-
-/* заголовки секцій і перемикачі */
-.kid .sec { color: var(--on-tab); }
-.kid .sec .pill, .kid .pill { background: var(--glass); color: var(--on-tab); }
-.kid .daypart { background: var(--glass); box-shadow: none; border-radius: 999px; }
-.kid .daypart button { border-radius: 999px; }
-.kid .daypart button { color: rgba(255, 255, 255, .9); }
-.kid .daypart button.on { background: #fff; color: var(--accent); }
-.kid .hearts-bar { background: var(--glass); box-shadow: none; }
-.kid .empty-note { color: rgba(255, 255, 255, .9); }
-
-/* картки справ — білі, без рамок */
-.kid .task { background: #fff; border-radius: 30px; box-shadow: var(--shadow); }
-.kid .task .t-icon { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .12)); }
-.kid .task.done { background: rgba(255, 255, 255, .55); opacity: 1; box-shadow: none; }
-.kid .task.done .t-title, .kid .task.done .t-icon { opacity: .6; }
-.kid .task.wait { background: #fff8d9; }
-.kid .t-badge { box-shadow: 0 4px 10px rgba(0, 0, 0, .12); }
-.kid .car-arrow { background: #fff; color: var(--accent); box-shadow: var(--shadow); border: 0; }
+/* картки справ */
+.car-track { gap: 12px; }
+.car-track .task { flex-basis: 184px; }
+.task { background: var(--card); box-shadow: var(--shadow); border-radius: 20px; padding: 18px 12px 14px; min-height: 176px; gap: 10px; }
+.task:active { transform: scale(.97); }
+.t-icon { font-size: 52px; }
+.t-title { font-size: 16px; font-weight: 600; line-height: 1.25; color: var(--ink); }
+.t-price { font-size: 18px; }
+.t-streak { top: 10px; left: 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.t-badge { top: 10px; right: 10px; width: 28px; height: 28px; font-size: 15px; box-shadow: none; }
+.t-badge.ok { background: #34c759; font-size: 16px; }
+.t-badge.wait { background: #ffcc00; animation: none; }
+.t-count { top: 10px; right: 10px; background: #34c759; font-size: 12px; font-weight: 700; }
+.t-slot { position: absolute; top: 10px; left: 10px; font-size: 16px; }
+.task.done { background: var(--card); opacity: .5; }
+.task.wait { background: var(--card); box-shadow: var(--shadow), inset 0 0 0 2px #ffcc00; }
+.car-arrow { background: var(--card); color: var(--accent); box-shadow: var(--shadow-up); border: 0; width: 40px; height: 40px; font-size: 26px; font-weight: 500; }
 
 /* мрії */
-.kid .wish { background: #fff; border-radius: 30px; box-shadow: var(--shadow); }
-.kid .wish.add { background: var(--glass); border: 3px dashed rgba(255, 255, 255, .7); color: var(--on-tab); }
-.kid .wish.add .big { color: #fff; }
-.kid .shelf-item { color: var(--on-tab); }
+.wish-grid { gap: 14px; }
+.wish { background: var(--card); box-shadow: var(--shadow); border-radius: var(--r-lg); padding: 12px; }
+.wish.main { outline: 2px solid var(--accent); outline-offset: 0; }
+.wish.add { background: transparent; border: 1.5px dashed var(--line); box-shadow: none; color: var(--muted); }
+.wish.add .big { color: var(--accent); font-weight: 300; font-size: 56px; }
+.wish-body b { font-size: 17px; font-weight: 600; }
+.wish .star { font-size: 22px; top: 18px; right: 18px; }
+.wish-state { color: var(--muted); font-weight: 600; font-size: 15px; }
+.shelf-item { font-weight: 600; font-size: 14px; color: var(--ink); }
+.shelf-item .wish-pic { border: 2px solid var(--accent); }
 
 /* успіхи */
-.kid .day, .kid .stat, .kid .streak, .kid .hist { background: #fff; box-shadow: var(--shadow); border-radius: 26px; }
-.kid .day.today { outline: 4px solid #fff; outline-offset: 3px; }
-.kid .day.future { opacity: .55; }
-.kid .album, .kid .sticker-next { color: var(--on-tab); }
+.album, .day, .stat, .streak, .hist { background: var(--card); box-shadow: var(--shadow); border: 0; }
+.album { border-radius: var(--r-lg); padding: 14px; gap: 8px; }
+.sticker { background: #f2f2f7; border-radius: var(--r-sm); }
+.sticker img { filter: brightness(0) opacity(.1); }
+.sticker.got { background: var(--tint); transform: none; }
+.sticker.got:nth-child(2n) { transform: none; }
+.sticker.got img { filter: none; }
+.sticker-next { color: var(--muted); font-weight: 600; font-size: 14px; }
+.day { border-radius: var(--r-md); min-height: 84px; }
+.day small { color: var(--muted); font-weight: 600; font-size: 13px; }
+.day.today { outline: 2px solid var(--accent); outline-offset: 0; }
+.stat, .streak { border-radius: var(--r-lg); }
+.stat > b { font-size: 30px; font-weight: 700; }
+.stat small, .streak small { color: var(--muted); font-weight: 500; font-size: 13px; }
+.streak span { font-size: 34px; }
+.streak b { font-size: 22px; font-weight: 700; }
+.hist { border-radius: var(--r-lg); padding: 2px 16px; }
+.h-row { border-bottom: .5px solid var(--line); }
+.h-note { font-weight: 600; }
+.h-note small { color: var(--muted); font-weight: 500; }
+.h-row b { font-size: 17px; font-weight: 600; }
+.plus { color: #248a3d; }
+.minus { color: #d70015; }
+.mini-bar { height: 6px; background: var(--fill); }
+.mini-bar i { background: var(--accent); }
 
-/* навігація — біла «таблетка», активна вкладка в її кольорі */
-.kid-nav { background: rgba(255, 255, 255, .96); box-shadow: 0 14px 34px rgba(60, 10, 60, .18); border-radius: 999px; padding: 8px 10px; }
-.nav-btn { border-radius: 999px; }
-.nav-btn.on { background: var(--tab); }
-.nav-btn.on small { color: #fff; }
-.nav-btn .badge { background: var(--tab-deep); color: #fff; }
+/* навігація — tab bar iOS: напівпрозора панель, активний пункт кольору друга */
+.kid-nav { background: var(--nav); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 26px; padding: 6px; gap: 2px; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .06), 0 10px 30px rgba(0, 0, 0, .10); }
+.nav-btn { min-width: 84px; padding: 6px 12px; border-radius: 20px; gap: 2px; }
+.nav-btn span { font-size: 26px; }
+.nav-btn small { font-size: 12px; font-weight: 600; color: var(--muted); }
+.nav-btn.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.nav-btn.on small { color: var(--accent); }
+.nav-btn.lock { min-width: 72px; opacity: 1; }
+.nav-btn .badge { background: #ff3b30; color: #fff; font-size: 11px; font-weight: 700; top: -4px; right: 2px; padding: 2px 6px; box-shadow: 0 0 0 2px #fff; }
+.hold-ring { border-color: var(--accent); border-width: 3px; }
 
-/* ---------- батьківський режим: світлий, спокійний ---------- */
-html[data-view="parent"] .card, html[data-view="parent"] fieldset { box-shadow: var(--shadow); border-color: transparent; }
+/* ---------- вибір друга ---------- */
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; margin: 8px 0 4px; }
+.comp-grid.big { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+.comp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px;
+  border-radius: var(--r-md); background: #fff; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); cursor: pointer; transition: transform .12s; }
+.comp:active { transform: scale(.96); }
+.comp input { position: absolute; opacity: 0; pointer-events: none; }
+.comp-pic { position: relative; display: block; width: 100%; aspect-ratio: 1; }
+.comp-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.comp-grid:not(.big) .comp-pic { flex: none; width: 72%; margin: 0 auto 6px; background: color-mix(in srgb, var(--c) 20%, #fff); }
+.comp-grid:not(.big) .comp-pic img { position: static; }
+.comp b { font-size: 14px; font-weight: 600; }
+.comp small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.comp:has(input:checked), .comp.on { box-shadow: inset 0 0 0 2.5px var(--c); }
+.comp:has(input:checked)::after, .comp.on::after { content: "✓"; position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--c); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 13px; }
+.comp-grid.big .comp { background: color-mix(in srgb, var(--c) 12%, #fff); box-shadow: none; padding: 12px 8px; }
+.comp-grid.big .comp.on { box-shadow: inset 0 0 0 2.5px var(--c); }
+.comp-grid.big .comp-pic { aspect-ratio: auto; height: clamp(130px, 22vh, 180px); margin-bottom: 6px; }
+.comp-grid.big .comp-pic img { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .12)); }
+.comp-modal { width: min(920px, 100%); }
+.kid-top .mascot.m1 { cursor: pointer; }
 
 /* ---------- онбординг ---------- */
-html[data-view="onboarding"] .ob-title { color: #fff; text-shadow: none; }
-html[data-view="onboarding"] .ob-sub { color: rgba(255, 255, 255, .92); }
-html[data-view="onboarding"] .btn-col .btn:not(.ghost) { background: #fff; color: var(--tab-deep); }
-html[data-view="onboarding"] .btn-col .btn.ghost { background: transparent; color: #fff; border: 2px solid rgba(255, 255, 255, .85); }
-html[data-view="onboarding"] .card { box-shadow: 0 20px 50px rgba(80, 10, 60, .18); border-radius: 34px; }
+.ob-title { color: var(--ink); font-weight: 700; letter-spacing: -.02em; }
+.ob-sub { color: var(--muted); font-weight: 500; }
+.ob .card { border-radius: 26px; box-shadow: var(--shadow-up); }
+
+/* ---------- батьківський режим ---------- */
+.card, fieldset { border-radius: var(--r-lg); }
+html[data-view="parent"] .card, html[data-view="parent"] fieldset { box-shadow: var(--shadow); border-color: transparent; background: var(--card); }
 
 /* ---------- вікна ---------- */
-.modal-card { border-radius: 34px; }
-.modal-back { background: rgba(40, 15, 50, .35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.x { background: #f4eef6; }
+.modal-card { border-radius: 28px; box-shadow: 0 24px 60px rgba(0, 0, 0, .18); }
+.modal-card h2 { font-size: 22px; font-weight: 700; }
+.modal-back { background: rgba(0, 0, 0, .28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.x { width: 32px; height: 32px; top: 16px; right: 16px; background: var(--fill); color: var(--muted); font-size: 14px; font-weight: 700; }
 
-/* шапка: один компаньйон (тап — обрати іншого) */
-.kid-top { grid-template-columns: 100px 1fr auto; }
-.kid-top .mascot { width: 100px; height: 100px; }
-.kid-top .mascot img { width: 100%; height: 100%; object-fit: contain; }
+/* ---------- телефон ---------- */
 @media (max-width: 600px) {
-  .kid-top { grid-template-columns: 60px 1fr auto; gap: 10px; }
-  .kid-top .mascot { width: 60px; height: 60px; }
+  .kid-top { grid-template-columns: 48px 1fr auto; gap: 10px; margin-bottom: 18px; }
+  .kid-top .mascot { width: 48px; height: 48px; }
+  .hello h1 { font-size: 24px; }
+  .total-pill { font-size: 18px; padding: 6px 12px 6px 8px; }
+  .jar { padding: 12px 6px 10px; }
+  .jar-glass { width: 48px; }
+  .jar-art .emoji-mascot { font-size: 24px; }
+  .jar-amt { font-size: 18px; }
+  .sec { font-size: 20px; }
+  .car-track .task { flex-basis: 150px; }
+  .task { min-height: 156px; }
+  .t-icon { font-size: 44px; }
+  .t-title { font-size: 15px; }
   .comp-grid.big { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .comp-grid.big .comp-pic { height: 110px; }
+  .comp-grid.big .comp-pic { height: 108px; }
+  .nav-btn { min-width: 70px; padding: 6px 8px; }
 }
-
-/* ---------- голівки компаньйонів — круглі аватари ----------
-   Аватари — квадрати з усією головою (tools/make_avatars.py), коло обрізає плечі знизу. */
-.kid-top .mascot, .jar-art:has(.head), .mv-art:has(.head), .comp-grid:not(.big) .comp-pic, h1 .hero-img.head {
-  border-radius: 50%; overflow: hidden;
-  background: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, .95) 0 30%, var(--tab-2) 100%);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, .8), 0 10px 22px rgba(40, 10, 50, .14);
-}
-.kid-top .mascot { animation: none; }
-.kid-top .mascot .hero-img.head, .jar-art .hero-img.head, .mv-art .hero-img.head, .comp-grid:not(.big) .comp-pic .hero-img.head {
-  width: 100%; height: 100%; object-fit: cover; object-position: 50% 0;
-  filter: none;
-}
-.comp-grid:not(.big) .comp-pic { flex: none; width: 78%; margin: 4px auto 8px; background: radial-gradient(circle at 50% 28%, rgba(255, 255, 255, .95) 0 30%, var(--cl) 100%); }
-.comp-grid:not(.big) .comp-pic img { position: static; }
-/* у скарбничці — коло по центру скла */
-.jar-art:has(.head) { inset: auto; left: 50%; top: 50%; width: 68%; aspect-ratio: 1; height: auto; transform: translate(-50%, -46%); box-shadow: 0 0 0 3px rgba(255, 255, 255, .8); }
-h1 .hero-img.head { width: 1.4em; height: 1.4em; object-fit: cover; object-position: 50% 0; }
-
-/* ---------- Liquid Glass (v27) ----------
-   Дитячий екран: замість білих карток — напівпрозоре скло з розмиттям, відблиском і світлою обвідкою.
-   Вікна й батьківський режим лишаються білими (читабельність форм). */
-:root {
-  --lg-fill: linear-gradient(150deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, .16) 55%, rgba(255, 255, 255, .24) 100%);
-  --lg-edge: rgba(255, 255, 255, .55);
-  --lg-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .22),
-    inset 0 0 22px rgba(255, 255, 255, .12), 0 12px 30px rgba(40, 10, 70, .14);
-  --lg-blur: blur(22px) saturate(170%);
-}
-.kid .task, .kid .dream-card:not(.empty), .kid .wish:not(.add), .kid .day, .kid .stat, .kid .streak, .kid .hist,
-.kid .total-pill, .kid .car-arrow, .kid .hearts-bar, .kid .daypart, .kid .jar, .kid-nav {
-  background: var(--lg-fill);
-  border: 1px solid var(--lg-edge);
-  box-shadow: var(--lg-shadow);
-  backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
-  color: #fff;
-}
-/* текст на склі — білий з легкою тінню */
-.kid .task .t-title, .kid .dream-info b, .kid .dream-left, .kid .wish-body b, .kid .stat > b, .kid .streak b,
-.kid .day small, .kid .h-note, .kid .h-row b, .kid .total-pill b, .kid .stars b {
-  color: #fff; text-shadow: 0 1px 2px rgba(40, 10, 70, .18);
-}
-.kid .dream-card small, .kid .dream-info small, .kid .wish-state, .kid .stat small, .kid .streak small,
-.kid .h-note small, .kid .stars, .kid .dream-info .wish-have small { color: rgba(255, 255, 255, .86); }
-.kid .plus { color: #eafff3; } .kid .minus { color: #ffe3e3; }
-.kid .h-row { border-color: rgba(255, 255, 255, .25); }
-.kid .task .t-icon, .kid .wish .wish-pic { filter: drop-shadow(0 8px 12px rgba(40, 10, 70, .18)); }
-/* стани справ */
-.kid .task.done { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5); }
-.kid .task.done .t-title, .kid .task.done .t-icon { opacity: .55; }
-.kid .task.wait { background: linear-gradient(150deg, rgba(255, 236, 150, .55), rgba(255, 210, 90, .22)); }
-/* прогрес мрії — біла смужка на склі */
-.kid .bar { background: rgba(255, 255, 255, .25); box-shadow: inset 0 1px 2px rgba(40, 10, 70, .12); }
-.kid .bar i { background: linear-gradient(90deg, rgba(255, 255, 255, .75), #fff); box-shadow: 0 0 10px rgba(255, 255, 255, .6); }
-.kid .wish-pic { background: rgba(255, 255, 255, .22); }
-.kid .pz-grid i { background: rgba(255, 255, 255, .28); }
-/* перемикачі й навігація: активний пункт — щільніше скло */
-.kid .daypart { padding: 5px; }
-.kid .daypart button.on, .nav-btn.on {
-  background: rgba(255, 255, 255, .62); color: var(--tab-deep);
-  box-shadow: inset 0 1px 0 #fff, 0 4px 12px rgba(40, 10, 70, .12);
-}
-.nav-btn small { color: rgba(255, 255, 255, .92); }
-.nav-btn.on small { color: var(--tab-deep); }
-.kid-nav { box-shadow: var(--lg-shadow), 0 18px 40px rgba(40, 10, 70, .22); }
-.kid .car-arrow { color: #fff; }
-.kid .t-badge.wait { background: rgba(255, 244, 200, .9); }
-.kid .day.today { outline-color: rgba(255, 255, 255, .9); }
-/* скарбнички: внутрішнє «скло» трохи світліше */
-.kid .jar-glass { background: rgba(255, 255, 255, .28); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8); }
-/* контраст білого тексту на світлих темах (Лео, Пінго): тінь кольору компаньйона */
-.kid .task .t-title, .kid .dream-info b, .kid .dream-left, .kid .wish-body b, .kid .stat > b, .kid .streak b,
-.kid .day small, .kid .h-note, .kid .h-row b, .kid .total-pill b, .kid .stars b, .kid .jar-amt, .kid .jar-label,
-.kid .hello h1, .kid .hello .sub, .kid .sec, .nav-btn small, .kid .daypart button, .kid .wish-state, .kid .dream-card small {
-  text-shadow: 0 1px 3px color-mix(in srgb, var(--tab-deep) 70%, transparent);
-}
-.nav-btn.on small, .kid .daypart button.on { text-shadow: none; }
-/* альбом наліпок на склі: закриті — білі силуети */
-.kid .album { background: var(--lg-fill); border: 1px solid var(--lg-edge); box-shadow: var(--lg-shadow); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur); }
-.kid .sticker { background: rgba(255, 255, 255, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45); }
-.kid .sticker img { filter: brightness(0) invert(1) opacity(.45); }
-.kid .sticker.got { background: rgba(255, 255, 255, .5); }
-.kid .sticker.got img { filter: drop-shadow(0 4px 4px rgba(40, 10, 70, .2)); }
-.kid .sticker-next { color: rgba(255, 255, 255, .92); }
-.kid .wish-have, .kid .wish-have small { color: rgba(255, 255, 255, .92); text-shadow: 0 1px 3px color-mix(in srgb, var(--tab-deep) 70%, transparent); }
