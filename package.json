@@ -1,0 +1,25 @@
+{
+  "name": "mini-money",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Скарбничка для дітей: справи, монетки, мрії (PWA + iOS через Capacitor)",
+  "scripts": {
+    "build:www": "node tools/build_www.js",
+    "ios:sync": "node tools/build_www.js && npx cap sync ios",
+    "ios:open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/camera": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/local-notifications": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "firebase": "10.12.2"
+  }
+}

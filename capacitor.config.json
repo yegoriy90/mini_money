@@ -1,0 +1,13 @@
+{
+  "appId": "ua.minimoney.app",
+  "appName": "Mini Money",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#fff0f6"
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 600, "backgroundColor": "#fff0f6", "showSpinner": false },
+    "LocalNotifications": { "iconColor": "#ff5fa2" }
+  }
+}

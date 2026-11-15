@@ -4,8 +4,8 @@
 // time (для щоденних): morning — ранок, evening — вечір, both — двічі (ранок і вечір окремо), без time — будь-коли протягом дня.
 
 export const AGE_GROUPS = [
-  { id: '4-5', title: '4–5 років', theme: 'kitty' },
-  { id: '6-7', title: '6–7 років', theme: 'kitty' },
+  { id: '4-5', title: '4–5 років', theme: 'toys' },
+  { id: '6-7', title: '6–7 років', theme: 'toys' },
   { id: '8-10', title: '8–10 років', theme: 'space' },
 ];
 

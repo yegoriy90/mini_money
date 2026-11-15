@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS = {
   childVoc: '',
   gender: 'f',
   ageGroup: '4-5',
-  theme: 'kitty',
+  theme: 'toys',
   currency: 'coins', // coins | uah
   coinValue: 10, // грн за монетку
   jarsEnabled: true,
