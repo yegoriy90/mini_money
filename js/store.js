@@ -9,10 +9,10 @@ export const FB = location.protocol === 'capacitor:' ? new URL('../vendor/fireba
 
 function clean(obj) { return JSON.parse(JSON.stringify(obj)); }
 
-function snapshotState(cols, ready) {
+function snapshotState(cols, ready, extra = {}) {
   const list = c => Object.entries(cols[c] || {}).map(([id, d]) => ({ id, ...d }));
   return {
-    ready,
+    ready, ...extra,
     settings: cols.meta?.settings || null,
     tasks: list('tasks').sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0)),
     wishes: list('wishes').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)),
@@ -73,30 +73,58 @@ function loadFirebase() {
       await new Promise(res => { const off = auth.onAuthStateChanged(au, u => { off(); res(u); }); });
     }
     if (!au.currentUser) await auth.signInAnonymously(au);
-    return { fs, db };
+    return { fs, db, uid: au.currentUser.uid };
   })().catch(e => { fbPromise = null; throw e; });
 }
 
+// назва пристрою для списку «Пристрої сім'ї»
+export function deviceLabel() {
+  const ua = navigator.userAgent;
+  if (/iPad|Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'Android-телефон' : 'Android-планшет';
+  if (/Mac/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Комп’ютер';
+  return 'Пристрій';
+}
+const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const code = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), x => ALPH[x % ALPH.length]).join('');
+
 class CloudStore {
-  constructor(fid) { this.fid = fid; this.mode = 'cloud'; this.cols = {}; }
-  async open() { const { fs, db } = await loadFirebase(); this.fs = fs; this.db = db; return this; }
+  constructor(fid) { this.fid = fid; this.mode = 'cloud'; this.cols = {}; this.family = null; this.members = null; }
+  async open() { const { fs, db, uid } = await loadFirebase(); this.fs = fs; this.db = db; this.uid = uid; return this; }
   ref(col, id) { return this.fs.doc(this.db, 'families', this.fid, col, id); }
+  rootRef() { return this.fs.doc(this.db, 'families', this.fid); }
   async exists() {
-    const snap = await this.fs.getDoc(this.fs.doc(this.db, 'families', this.fid));
+    const snap = await this.fs.getDoc(this.rootRef());
     return snap.exists();
   }
   async createRoot() {
-    await this.fs.setDoc(this.fs.doc(this.db, 'families', this.fid), { createdAt: Date.now() });
+    // спершу без legacy: якщо в хмарі ще старі правила і членство не запишеться, сім'я лишиться доступною за кодом
+    await this.fs.setDoc(this.rootRef(), { createdAt: Date.now(), owner: this.uid });
+  }
+  // записати цей пристрій у сім'ю (якщо ще не записаний); invite — код запрошення
+  async ensureMember(info = {}, invite) {
+    const r = this.ref('members', this.uid);
+    try { if ((await this.fs.getDoc(r)).exists()) return true; } catch { /* ще не член — читати не можна */ }
+    await this.fs.setDoc(r, { role: info.role || 'child', label: info.label || deviceLabel(), joinedAt: Date.now(), ...(invite ? { invite } : {}) });
+    return true;
   }
   watch(cb, onError) {
     const seen = new Set();
+    const emit = () => cb(snapshotState(this.cols, seen.size === COLS.length, { family: this.family, members: this.members, uid: this.uid }));
     const offs = COLS.map(col => this.fs.onSnapshot(this.fs.collection(this.db, 'families', this.fid, col), snap => {
       const c = {};
       snap.forEach(d => { c[d.id] = d.data(); });
       this.cols[col] = c;
       seen.add(col);
-      cb(snapshotState(this.cols, seen.size === COLS.length));
+      emit();
     }, err => onError?.(err)));
+    // сім'я й пристрої — необов'язкові (за старих правил читати їх не можна)
+    offs.push(this.fs.onSnapshot(this.rootRef(), d => { this.family = d.exists() ? d.data() : null; emit(); }, () => {}));
+    offs.push(this.fs.onSnapshot(this.fs.collection(this.db, 'families', this.fid, 'members'), snap => {
+      this.members = []; snap.forEach(d => this.members.push({ id: d.id, ...d.data() })); emit();
+    }, err => { if (this.members) onError?.(err); /* доступ був і зник — пристрій відключили */ }));
     return () => offs.forEach(f => f());
   }
   async batch(ops) {
@@ -115,6 +143,27 @@ class CloudStore {
       else p.catch(() => {});
     }
   }
+  // одноразовий код для нового пристрою (8 символів, 30 хвилин)
+  async createInvite(minutes = 30) {
+    const c = code(8), exp = Date.now() + minutes * 60000;
+    await this.fs.setDoc(this.fs.doc(this.db, 'invites', c), { fid: this.fid, exp, createdBy: this.uid });
+    return { code: c, exp };
+  }
+  async updateMe(data) { await this.fs.setDoc(this.ref('members', this.uid), data, { merge: true }); }
+  async removeMember(uid) { await this.fs.deleteDoc(this.ref('members', uid)); }
+  async closeLegacy() { await this.fs.setDoc(this.rootRef(), { legacy: false }, { merge: true }); }
+  // повне видалення сім'ї: усі колекції, інші пристрої, корінь, а цей пристрій — останнім
+  async deleteFamily() {
+    const del = async refs => { for (let i = 0; i < refs.length; i += 400) { const b = this.fs.writeBatch(this.db); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); } };
+    for (const col of COLS) {
+      const snap = await this.fs.getDocs(this.fs.collection(this.db, 'families', this.fid, col));
+      await del(snap.docs.map(d => d.ref));
+    }
+    const mem = await this.fs.getDocs(this.fs.collection(this.db, 'families', this.fid, 'members'));
+    await del(mem.docs.filter(d => d.id !== this.uid).map(d => d.ref));
+    await this.fs.deleteDoc(this.rootRef());
+    await this.fs.deleteDoc(this.ref('members', this.uid));
+  }
 }
 
 export async function openStore(fid) {
@@ -125,20 +174,47 @@ export async function openStore(fid) {
 export function localStore() { return new LocalStore('local'); }
 
 // Перенос локальних даних у нову хмарну сім'ю
-export async function migrateToCloud(fid) {
+export async function migrateToCloud(fid, info) {
   const src = new LocalStore('local').dump();
-  const dst = await new CloudStore(fid).open();
-  await dst.createRoot();
+  const dst = await createCloudFamily(fid, info);
   const ops = [];
   for (const col of COLS) for (const [id, data] of Object.entries(src[col] || {})) ops.push({ op: 'set', col, id, data });
   await dst.batch(ops);
   return dst;
 }
 
-export async function createCloudFamily(fid) {
+export async function createCloudFamily(fid, info = {}) {
   const s = await new CloudStore(fid).open();
   await s.createRoot();
+  try { await s.ensureMember({ ...info, role: info.role || 'parent' }); await s.closeLegacy(); } catch { /* старі правила без членства — не заважає */ }
   return s;
+}
+
+// Приєднатися: спершу як код запрошення, потім — як старий код сім'ї (перехідний режим)
+export async function joinFamily(raw, info = {}) {
+  const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const probe = await new CloudStore('_').open();
+  if (c.length === 8) {
+    const inv = await probe.fs.getDoc(probe.fs.doc(probe.db, 'invites', c));
+    if (!inv.exists()) throw new Error('Такого коду немає — попросіть новий');
+    const { fid, exp } = inv.data();
+    if (exp < Date.now()) throw new Error('Код уже не діє — попросіть новий');
+    const s = await new CloudStore(fid).open();
+    await s.ensureMember(info, c);
+    return fid;
+  }
+  if (c.length === 10) {
+    const s = await new CloudStore(c).open();
+    let ok;
+    try { ok = await s.exists(); } catch (e) { if (e.code === 'permission-denied') throw new Error('Код не підходить або вже закритий — попросіть код запрошення'); throw e; }
+    if (!ok) throw new Error('Такої сім\'ї не знайдено');
+    try { await s.ensureMember(info); } catch {
+      // старі правила (без членства): достатньо, що дані читаються
+      try { await s.fs.getDoc(s.ref('meta', 'settings')); } catch { throw new Error('Код не підходить або вже закритий — попросіть код запрошення'); }
+    }
+    return c;
+  }
+  throw new Error('Код запрошення має 8 символів');
 }
 
 export async function cloudFamilyExists(fid) {

@@ -1,16 +1,48 @@
 rules_version = '2';
-// Дані сім'ї доступні лише тим, хто знає її код (10 символів) і увійшов анонімно через застосунок.
-// Список усіх сімей отримати не можна.
+// Доступ до даних сім'ї мають лише ЗАПИСАНІ пристрої (families/{fid}/members/{uid}).
+// Новий пристрій записується: творець сім'ї; за одноразовим запрошенням (invites/{код}, діє ≤ 1 год);
+// або за старим кодом сім'ї — лише поки сім'я в «перехідному» режимі (поле legacy не false).
+// Список усіх сімей і запрошень отримати не можна.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMember(fid) {
+      return signedIn() && exists(/databases/$(database)/documents/families/$(fid)/members/$(request.auth.uid));
+    }
+
     match /families/{fid} {
-      allow get, create, update: if request.auth != null && fid.size() == 10;
-      allow list, delete: if false;
+      allow get: if isMember(fid) || (signedIn() && resource.data.get('legacy', true) != false);
+      allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
+      allow update, delete: if isMember(fid);
+      allow list: if false;
+
+      match /members/{uid} {
+        function fam() { return get(/databases/$(database)/documents/families/$(fid)).data; }
+        function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+        function inviteOk(code) {
+          return exists(invitePath(code)) && get(invitePath(code)).data.fid == fid
+            && get(invitePath(code)).data.exp > request.time.toMillis();
+        }
+        allow read: if isMember(fid);
+        allow create: if signedIn() && uid == request.auth.uid && (
+          fam().get('owner', '') == request.auth.uid
+          || fam().get('legacy', true) != false
+          || (request.resource.data.get('invite', '') != '' && inviteOk(request.resource.data.invite)));
+        allow update: if isMember(fid) && uid == request.auth.uid;
+        allow delete: if isMember(fid);
+      }
 
       match /{col}/{docId} {
-        allow read, write: if request.auth != null && fid.size() == 10
-          && col in ['meta', 'tasks', 'wishes', 'completions', 'ledger'];
+        allow read, write: if isMember(fid) && col in ['meta', 'tasks', 'wishes', 'completions', 'ledger'];
       }
+    }
+
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn() && code.size() == 8 && isMember(request.resource.data.fid)
+        && request.resource.data.exp <= request.time.toMillis() + 3600000;
+      allow delete: if signedIn() && isMember(resource.data.fid);
+      allow list, update: if false;
     }
   }
 }
