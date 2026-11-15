@@ -31,7 +31,7 @@ Mini Money — перша скарбничка для дітей 4–10 рокі
 • Щоденні звички (почистити зубки, застелити ліжко) дають сердечка, а п'ять сердечок — монетку.
 
 Друг-компаньйон
-Дитина обирає собі друга з 12 плюшевих героїв — зайчика, левеня, динозаврика, пінгвіня та інших. Від друга залежать кольори застосунку, а сам він радіє кожній виконаній справі.
+Дитина обирає собі друга й може дати йому власне ім'я. Друзі ростуть разом з дитиною: для 4–5 років — плюшеві іграшки, для 6–7 — мандрівники зі своєю справою, для 8–10 — круті герої-підлітки. Від друга залежать кольори застосунку, а сам він радіє кожній виконаній справі.
 
 Для батьків
 • Батьківський режим за PIN: ціни, справи, підтвердження, налаштування.
@@ -66,7 +66,7 @@ How it works
 • Daily habits (brush teeth, make the bed) earn hearts; five hearts make a coin.
 
 A companion friend
-Kids choose one of 12 plush friends — a bunny, a lion cub, a little dinosaur, a penguin and more. The friend sets the app's colors and cheers every finished chore.
+Kids choose a friend and can give it their own name. Friends grow up with the child: plush toys at 4–5, little adventurers at 6–7 and cool teen heroes at 8–10. The friend sets the app's colors and cheers every finished chore.
 
 For parents
 • PIN-protected parent mode: prices, chores, approvals, settings.
