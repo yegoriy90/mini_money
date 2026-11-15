@@ -14,7 +14,7 @@ export const THEMES = {
     mascots: [FLOPI_HEAD, MONKEY_HEAD], full: [FLOPI, MONKEY],
     jarArt: { spend: FLOPI_HEAD, save: MONKEY_HEAD, give: emoji('💝') },
     color: '#ff5fa2',
-    celeVideo: '', // assets/cele-heroes.mp4 — анімація святкування, коли буде готова
+    celeVideo: 'assets/cele-heroes.mp4', // анімація святкування (Magnific, MiniMax H3), постер — .jpg
   },
   space: {
     title: 'Космос', preview: '🚀🪐',
