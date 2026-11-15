@@ -4,8 +4,9 @@ import {
   balances, total, taskState, currentStreak, approveOps, buyOps, cashOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
 import { openStore, cloudAvailable, createCloudFamily, migrateToCloud, joinFamily } from './store.js';
-import { THEMES, theme, themeId } from './themes.js';
+import { COMPANIONS, theme, themeId, applyColors, heroFull, heroHead } from './themes.js';
 import { speak, say, setVoice, sound, confetti } from './fx.js';
+import { isNative, pickPhoto, REMINDERS, getReminders, setReminders, applyReminders } from './native.js';
 
 const $app = document.getElementById('app');
 const $modal = document.getElementById('modal');
@@ -76,6 +77,7 @@ function onData(state) {
   else if (S.seenFamily && state.family === null && state.members) { S.seenFamily = false; return noAccess(); }
   S.data = { ...state, settings: state.settings ? withDefaults(state.settings) : null, rawSettings: state.settings };
   S.error = null;
+  if (isNative && state.settings && !S.remindSynced) { S.remindSynced = true; applyReminders(getReminders(), remindCtx()).catch(() => {}); }
   if (state.settings && state.settings.heartsSince == null && !S.migratingHearts) {
     S.migratingHearts = true;
     db([{ op: 'update', col: 'meta', id: 'settings', data: { heartsSince: Date.now() } }]);
@@ -109,6 +111,8 @@ function render() {
     return noAccess(); // сім'ю видалили з іншого пристрою
   }
   document.documentElement.dataset.theme = themeId(st().theme);
+  applyColors(st().theme);
+  document.documentElement.dataset.view = isParentView() ? 'parent' : S.view;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme(st().theme).color);
   // зберегти прокрутку каруселей між перемальовуваннями
   const keep = {};
@@ -141,6 +145,13 @@ function capacity(bal) {
   return cap * unitK(st());
 }
 
+// ---------- КОМПАНЬЙОНИ ----------
+function companionGrid(name, cur, action = '') {
+  return `<div class="comp-grid">${COMPANIONS.map(c => `<label class="comp" style="--c:${c.color};--cl:${c.light}">
+    <input type="radio" name="${name}" value="${c.id}"${c.id === cur ? ' checked' : ''}${action ? ` data-a="${action}"` : ''}>
+    <span class="comp-pic">${heroHead(c)}</span><b>${c.name}</b></label>`).join('')}</div>`;
+}
+
 // ---------- ДИТЯЧИЙ ЕКРАН ----------
 function renderKid() {
   const s = st(), th = theme(s.theme);
@@ -149,11 +160,10 @@ function renderKid() {
   const views = { tasks: kidTasks, dreams: kidDreams, progress: kidProgress };
   return `<div class="kid">
     <header class="kid-top">
-      <div class="mascot m1">${th.mascots[0]}</div>
+      <button class="mascot m1" data-a="pick-companion" aria-label="Обрати друга">${th.mascots[0]}</button>
       <div class="hello"><h1>Привіт, ${esc(s.childVoc || s.childName)}!</h1>
         <div class="sub">${new Date().toLocaleDateString('uk-UA', { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <button class="total-pill" data-a="say-total">${coinIcon()}<b>${num(fromK(total(bal), s))}</b></button>
-      <div class="mascot m2">${th.mascots[1]}</div>
     </header>
     <main class="kid-main">${views[S.view]()}</main>
     <nav class="kid-nav">
@@ -512,7 +522,7 @@ function pSettings() {
       <div class="f">Вік (набір завдань у бібліотеці)</div>${seg('ageGroup', s.ageGroup, AGE_GROUPS.map(a => [a.id, a.title]))}
     </fieldset>
     <fieldset><legend>Оформлення</legend>
-      <div class="themes">${Object.entries(THEMES).map(([id, t]) => `<label class="theme-pick t-${id}"><input type="radio" name="theme" value="${id}" ${themeId(s.theme) === id ? 'checked' : ''}><span><em>${t.preview}</em>${t.title}</span></label>`).join('')}</div>
+      <div class="f">Друг-компаньйон (від нього залежать кольори)</div>${companionGrid('theme', themeId(s.theme))}
     </fieldset>
     <fieldset><legend>Гроші</legend>
       ${seg('currency', s.currency, [['coins', '🪙 Монетки'], ['uah', '₴ Гривні']])}
@@ -551,7 +561,8 @@ function pSettings() {
     ${cloud ? '' : `<label class="btn ghost">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>`}</div>
   </fieldset>
   <fieldset><legend>Цей пристрій</legend>
-    ${cloud ? seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"') : ''}
+    ${seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"')}
+    ${isNative ? remindBlock() : ''}
     <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати цей пристрій</button><button class="btn no" data-a="delete-family">🗑 Видалити сім'ю й усі дані</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
     ${cloud ? `<p class="hint">«Видалити сім'ю» назавжди стирає з хмари всі справи, мрії, монетки й налаштування та від'єднує всі пристрої.</p>` : ''}
   </fieldset>
@@ -561,6 +572,18 @@ function pSettings() {
 
 // ---------- ВІКНА ----------
 // Синхронізація: пристрої сім'ї, запрошення, старий код
+// нагадування — налаштування лише цього пристрою
+function remindCtx() { return { role: S.device?.role, name: S.data?.settings?.childName || '' }; }
+function remindBlock() {
+  const r = getReminders();
+  return `<div class="f">Нагадування на цьому пристрої</div>
+    ${REMINDERS.map(x => `<div class="remind-row">
+      <label class="check"><input type="checkbox" data-a="remind-toggle" data-k="${x.key}"${r[x.key] ? ' checked' : ''}> ${x.label}</label>
+      <input type="time" data-a="remind-time" data-k="${x.key}" value="${r[x.key] || x.def}"${r[x.key] ? '' : ' disabled'}>
+    </div>`).join('')}
+    <p class="hint">${S.device?.role === 'parent' ? 'Телефон нагадає перевірити справи.' : 'iPad щодня нагадає про звички.'} Сповіщення приходять, навіть коли застосунок закритий.</p>`;
+}
+
 function syncBlock() {
   const fam = S.data?.family, members = S.data?.members, me = S.data?.uid;
   const oldCode = `${S.device.fid.slice(0, 5)}-${S.device.fid.slice(5)}`;
@@ -846,6 +869,18 @@ const A = {
   'say-sticker'(el) { Number(el.dataset.i) < stickers().count ? sayF('sticker_mine', 'Це твоя наліпка!') : sayF('sticker_soon', 'Роби справи — і буде нова наліпка!'); },
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data), left = h.per - h.now; sayF(left <= 5 ? `hearts_left_${left}` : 'price_heart', 'Збирай сердечка — і буде монетка!'); },
+  'pick-companion'() {
+    sound.tap();
+    const cur = themeId(st().theme);
+    openModal(`<button class="x" data-a="close">✕</button><h2>Обери друга 💫</h2>
+      <div class="comp-grid big">${COMPANIONS.map(c => `<button class="comp${c.id === cur ? ' on' : ''}" style="--c:${c.color};--cl:${c.light}" data-a="set-companion" data-id="${c.id}">
+        <span class="comp-pic">${heroFull(c)}</span><b>${c.name}</b><small>${c.who}</small></button>`).join('')}</div>`, 'comp-modal');
+  },
+  async 'set-companion'(el) {
+    closeModal(); sound.done(); confetti(40);
+    await db([{ op: 'update', col: 'meta', id: 'settings', data: { theme: el.dataset.id } }]);
+  },
+  'ob-companion'(el) { applyColors(el.value); sound.tap(); },
   'kid-view'(el) { sound.tap(); S.view = el.dataset.v; render(); window.scrollTo(0, 0); },
   'say-total'() { sayF('total_coins', 'Ось скільки в тебе монеток!'); sound.coin(); },
   'say-jar'(el) {
@@ -939,9 +974,25 @@ const A = {
     if (!confirm('Скасувати цей запис? Баланс зміниться.')) return;
     await db([{ op: 'delete', col: 'ledger', id: el.dataset.id }]);
   },
+  async 'remind-toggle'(el) {
+    const r = getReminders(), k = el.dataset.k, time = $app.querySelector(`[data-a="remind-time"][data-k="${k}"]`);
+    if (el.checked) r[k] = time?.value || REMINDERS.find(x => x.key === k).def; else delete r[k];
+    if (time) time.disabled = !el.checked;
+    const ok = await setReminders(r, remindCtx()).catch(() => false);
+    if (!ok) { el.checked = false; if (time) time.disabled = true; delete r[k]; await setReminders(r, remindCtx()).catch(() => {}); return toast('Дозвольте сповіщення: Параметри → Mini Money → Сповіщення'); }
+    if (el.checked) toast(`⏰ Нагадаю о ${r[k]}`);
+  },
+  async 'remind-time'(el) {
+    const r = getReminders(), k = el.dataset.k;
+    if (!r[k] || !el.value) return;
+    r[k] = el.value;
+    await setReminders(r, remindCtx()).catch(() => {});
+    toast(`⏰ Нагадаю о ${r[k]}`);
+  },
   async 'set-role'(el) {
     S.device = { ...S.device, role: el.value }; LS.set('mm.device', S.device); S.parent = false; S.preview = false; render();
     S.store?.updateMe?.({ role: el.value }).catch(() => {});
+    if (isNative) applyReminders(getReminders(), remindCtx()).catch(() => {});
   },
   async invite() {
     try {
@@ -1135,8 +1186,10 @@ async function onSubmit(form) {
   if (kind === 'ob-join') {
     const role = f.get('role');
     let fid;
+    const btn = form.querySelector('[type=submit]'), label = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Зачекайте…'; }
     try { fid = await joinFamily(f.get('code') || '', { role }); }
-    catch (e) { return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = label; } return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
     S.device = { fid, role }; LS.set('mm.device', S.device);
     S.noAccess = false;
     connect();
@@ -1145,11 +1198,12 @@ async function onSubmit(form) {
 
 // ---------- ОНБОРДИНГ ----------
 function renderOnboarding() {
-  document.documentElement.dataset.theme = 'toys';
-  const th = THEMES.toys, o = S.ob;
+  document.documentElement.dataset.view = 'onboarding';
+  const o = S.ob;
+  applyColors(o.form?.theme || 'flopi');
   if (o.step === 'welcome') {
     $app.innerHTML = `<div class="center-screen ob">
-      <div class="ob-mascots"><div class="mascot">${(th.full || th.mascots)[0]}</div><div class="mascot">${(th.full || th.mascots)[1]}</div></div>
+      <div class="ob-mascots">${['flopi', 'musi'].map(id => `<div class="mascot">${heroFull(COMPANIONS.find(c => c.id === id))}</div>`).join('')}</div>
       <h1 class="ob-title">Mini Money</h1>
       <p class="ob-sub">Скарбничка для маленьких помічників: справи → монетки → мрії</p>
       <div class="btn-col">
@@ -1167,6 +1221,7 @@ function renderOnboarding() {
       <label class="f">Як звертатись: «Привіт, …!»<input name="childVoc" value="${esc(v.childVoc || '')}" autocomplete="off"></label>
       ${seg('gender', v.gender || 'f', [['f', 'Дівчинка'], ['m', 'Хлопчик']])}
       <div class="f">Вік</div>${seg('ageGroup', v.ageGroup || '4-5', AGE_GROUPS.map(a => [a.id, a.title]))}
+      <div class="f">Обери друга — він буде поруч і дасть свій колір</div>${companionGrid('theme', v.theme || 'flopi', 'ob-companion')}
       <label class="f">PIN-код батьків (4 цифри)<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off"></label>
       <p class="hint">PIN відкриває батьківський режим: підтвердження справ, ціни, налаштування. На дитячому екрані — утримати 🔒.</p>
       ${cloudAvailable ? `<div class="f">Цей пристрій</div>${seg('role', v.role || 'child', [['child', '🧒 iPad дитини'], ['parent', '👨‍👩‍👧 Телефон батьків']])}` : ''}
@@ -1199,7 +1254,7 @@ async function obCreate() {
   const coinValue = DEFAULT_SETTINGS.coinValue;
   const settings = {
     ...DEFAULT_SETTINGS, childName: v.childName.trim(), childVoc: (v.childVoc || '').trim() || vocative(v.childName),
-    gender: v.gender, ageGroup: v.ageGroup, theme: AGE_GROUPS.find(a => a.id === v.ageGroup)?.theme || 'toys',
+    gender: v.gender, ageGroup: v.ageGroup, theme: themeId(v.theme),
     pinHash: await hashPin(v.pin, PIN_SALT), createdAt: Date.now(), matchSince: Date.now(), heartsSince: Date.now(),
   };
   const now = Date.now();
@@ -1222,7 +1277,21 @@ async function obCreate() {
 
 // ---------- ПОДІЇ ----------
 let swallowUntil = 0; // клік від відпускання пальця після утримання 🔒 не має закрити PIN
+async function setWishPhoto(file) {
+  try {
+    M.photo = await resizeImage(file);
+    $modal.querySelector('.photo-prev').innerHTML = `<img src="${M.photo}" alt="">`;
+    $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.remove('on'));
+    sound.done();
+  } catch { toast('Не вдалося відкрити фото'); }
+}
 document.addEventListener('click', e => {
+  // у нативному застосунку — системна камера/фото замість вебвибору файлу
+  if (isNative && e.target.closest('#photoPick')) {
+    e.preventDefault();
+    pickPhoto().then(b => b && setWishPhoto(b), () => toast('Не вдалося відкрити камеру — перевірте дозвіл у Параметрах'));
+    return;
+  }
   const el = e.target.closest('[data-a]');
   if (!el || el.tagName === 'INPUT') return;
   if (Date.now() < swallowUntil && el.classList.contains('modal-back')) return;
@@ -1233,14 +1302,7 @@ document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
   if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
-  if (el.dataset.change === 'photo' && el.files?.[0]) {
-    try {
-      M.photo = await resizeImage(el.files[0]);
-      $modal.querySelector('.photo-prev').innerHTML = `<img src="${M.photo}" alt="">`;
-      $modal.querySelectorAll('.emoji-row .emo').forEach(b => b.classList.remove('on'));
-      sound.done();
-    } catch { toast('Не вдалося відкрити фото'); }
-  }
+  if (el.dataset.change === 'photo' && el.files?.[0]) setWishPhoto(el.files[0]);
 });
 document.addEventListener('input', e => {
   if (e.target.dataset.input === 'emoji') {

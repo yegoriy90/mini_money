@@ -59,7 +59,11 @@ function loadFirebase() {
       import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js'),
     ]);
     const a = app.initializeApp(firebaseConfig);
-    const au = auth.getAuth(a);
+    // у нативі (capacitor://) getAuth() зависає: тягне popup/redirect-резолвер з iframe authDomain,
+    // і onAuthStateChanged не спрацьовує. Без резолвера, лише з IndexedDB — працює.
+    const au = location.protocol === 'capacitor:'
+      ? auth.initializeAuth(a, { persistence: [auth.indexedDBLocalPersistence, auth.inMemoryPersistence] })
+      : auth.getAuth(a);
     let db;
     try {
       db = fs.initializeFirestore(a, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });

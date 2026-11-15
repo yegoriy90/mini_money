@@ -3,7 +3,7 @@
 Відповідай українською, неформально. Для Мії (5 років) — пізніше інші вікові групи.
 
 ## Структура
-- `index.html` — оболонка; `?v=` у підключеннях `css/app.css` і `js/app.js` + `VERSION` у `sw.js` піднімати при кожній зміні.
+- `index.html` — оболонка; при кожній зміні піднімати разом: `?v=` у `index.html`, `window.MM_VERSION` там же, `VERSION` і `?v=` у списку `SHELL` у `sw.js` (нові js-файли — теж у `SHELL`).
 - `js/app.js` — UI: онбординг, дитячий екран (справи / мрії / успіхи), батьківський режим (PIN), вікна, дії (`A`), форми.
 - `js/model.js` — логіка: гроші в **копійках**, баланс = сума `ledger`; `splitReward` (розподіл по скарбничках за «недобором», без зменшень), серії, `approveOps`/`buyOps`.
 - `js/store.js` — `LocalStore` (localStorage, fid `local`) і `CloudStore` (Firestore `families/{fid}/{meta|tasks|wishes|completions|ledger}`), однаковий API `watch/batch`. `migrateToCloud`.
@@ -27,8 +27,10 @@
 - Перевірка: Playwright 1180×820 (iPad), 820×1180, 390 (телефон); без помилок у консолі, без горизонтального скролу. Хмару — на емуляторі (Firebase SDK з npm `firebase@10.12.2`, підміна gstatic через `ctx.route`).
 
 ## App Store (у роботі з 15.11.2026)
+- **Компаньйони (з v24):** дитина обирає друга (онбординг, тап по героєві в шапці, налаштування) — `COMPANIONS` у themes.js, поле `settings.theme` = id компаньйона (старі `toys/kitty/space/forest` мапляться в `themeId`). Колір теми — від компаньйона (`applyColors` → `--tab/--tab-2/--tab-deep`). 12 героїв: Флопі, Мусі + 10 оригінальних плюшевих (Magnific, фон прибрано, `tools/cut_heroes.py` → `assets/heroes/<img>.webp`; круглі аватари з усією головою — `tools/make_avatars.py` → `<img>-avatar.webp`, межа голови (частка висоти): flopi .30, monkey .30, leo .40, dino .36, pingo .38, bublik .36, rusia .42, zirka .42, mur .40, bambu .42, khvylia .42, iskra .42). Нових героїв не копіювати з чужих ігор/брендів. Стиль «candy» — `css/candy.css` поверх app.css (суцільний колір, «скло», картки без рамок, кнопки-таблетки).
 - Мета — публічний застосунок. Герої — **Флопі** (сірий вухастий зайчик, менший) і **Мусі** (веселкова мавпочка) — за справжніми іграшками Мії. Ім’я — `HEROES` у themes.js. Тема `toys` (стара `kitty` мапиться на неї через `themeId`). Картинки `assets/heroes/` (повний зріст + голівки, вирізані з Magnific-генерації; `pair-square.jpg` — кадр для відео). Відео святкування `assets/cele-heroes.mp4` (MiniMax H3 Turbo, старт=кінець). Іконка `icons/icon-1024.png` → також `ios/.../AppIcon-512@2x.png`. Hello Kitty / Kuromi з коду прибрані.
 - Нативна обгортка: Capacitor 8 (`capacitor.config.json`, appId `ua.minimoney.app`, папка `ios/`, SPM). `npm run build:www` збирає `www/` (Firebase SDK локально в `www/vendor/firebase`, бо в нативі `location.protocol === 'capacitor:'`), `npm run ios:sync` → Xcode на Mac.
 - `privacy.html` і `support.html` (uk + en, стиль `css/page.css`) — для App Store: https://yegoriy90.github.io/mini_money/privacy.html, …/support.html. Посилання — внизу батьківських налаштувань (за PIN = батьківський бар'єр; у нативі — повна адреса, `SITE` в app.js). Контакт поки — GitHub Issues (публічні), краще окрема пошта. При зміні збору даних — оновлювати політику й дату.
 - Шрифт Nunito локально (`css/fonts.css`, `assets/fonts/`, OFL) — жодних запитів до Google Fonts (дитяча категорія: без сторонніх запитів, крім Firebase при синхронізації).
-- Ще треба: локальні сповіщення, haptics, нативна камера; Sign in with Apple (не обов'язково — немає стороннього входу); скриншоти й опис; перевірити комерційну ліцензію Magnific на голос/картинки.
+- Нативне (`js/native.js`, у браузері — нічого не робить): haptics на звуках (`sound.*` у fx.js), нагадування про звички — локальні сповіщення, налаштування лише пристрою (`mm.remind` у localStorage, «Цей пристрій» у налаштуваннях), фото мрії — плагін Camera (у `Info.plist` описи дозволів камери/фото). Тестова збірка в локальному режимі: після `build:www` замінити `www/js/firebase-config.js` на `null` + `npx cap copy ios`.
+- Ще треба: Sign in with Apple (не обов'язково — немає стороннього входу); скриншоти й опис; перевірити комерційну ліцензію Magnific на голос/картинки.
