@@ -4,7 +4,8 @@ import { firebaseConfig } from './firebase-config.js';
 
 export const COLS = ['meta', 'tasks', 'wishes', 'completions', 'ledger'];
 export const cloudAvailable = !!(firebaseConfig && firebaseConfig.apiKey);
-export const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
+// у нативному застосунку (capacitor://) Firebase SDK лежить локально в www/vendor — див. tools/build_www.js
+export const FB = location.protocol === 'capacitor:' ? new URL('../vendor/firebase/', import.meta.url).href : 'https://www.gstatic.com/firebasejs/10.12.2/';
 
 function clean(obj) { return JSON.parse(JSON.stringify(obj)); }
 

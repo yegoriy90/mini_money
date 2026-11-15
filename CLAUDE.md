@@ -24,3 +24,8 @@
 - Репозиторій **публічний**: жодних імен, фото чи кодів сім'ї в коді. Дані — лише в localStorage/Firestore.
 - Ідемпотентні id записів: `earn_<completionId>`, `bonus_<id>`, `match_<id>`, `buy_<wishId>`, щоденна справа `<taskId>_<YYYY-MM-DD>`.
 - Перевірка: Playwright 1180×820 (iPad), 820×1180, 390 (телефон); без помилок у консолі, без горизонтального скролу. Хмару — на емуляторі (Firebase SDK з npm `firebase@10.12.2`, підміна gstatic через `ctx.route`).
+
+## App Store (у роботі з 15.11.2026)
+- Мета — публічний застосунок. Hello Kitty / Kuromi (Sanrio) **прибрати** перед публікацією: свої персонажі (концепти A/B/C у Magnific, вибір за власником).
+- Нативна обгортка: Capacitor 8 (`capacitor.config.json`, appId `ua.minimoney.app`, папка `ios/`, SPM). `npm run build:www` збирає `www/` (Firebase SDK локально в `www/vendor/firebase`, бо в нативі `location.protocol === 'capacitor:'`), `npm run ios:sync` → Xcode на Mac.
+- Ще треба: локальні сповіщення, haptics, нативна камера; Sign in with Apple + правила Firestore «лише члени сім'ї»; кнопка «Видалити сім'ю й дані»; політика конфіденційності й підтримка; іконка 1024, скриншоти; перевірити комерційну ліцензію Magnific на голос/картинки.
