@@ -547,3 +547,14 @@ legend + * { clear: both; }
 .ob-mascots .mascot { width: 170px; height: 210px; }
 .ob-mascots .mascot:first-child { height: 160px; align-self: flex-end; }
 .ob-mascots { align-items: flex-end; }
+
+/* Пристрої сім'ї */
+.dev-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.dev-row { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 14px; padding: 10px 12px; }
+.dev-ic { font-size: 24px; }
+.dev-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dev-name small { opacity: .65; font-weight: 600; }
+.btn.small { padding: 8px 12px; font-size: 14px; min-height: 0; }
+.legacy-box { margin-top: 14px; padding: 12px; border: 2px dashed rgba(0,0,0,.15); border-radius: 16px; }
+.legacy-box p { margin: 0 0 6px; }
+.legacy-box b { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; }

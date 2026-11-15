@@ -3,7 +3,7 @@ import {
   JARS, JAR_META, DEFAULT_SETTINGS, withDefaults, dayKey, addDays, unitK, toK, fromK, num, money, moneyFull,
   balances, total, taskState, currentStreak, approveOps, buyOps, cashOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
-import { openStore, cloudAvailable, createCloudFamily, cloudFamilyExists, migrateToCloud } from './store.js';
+import { openStore, cloudAvailable, createCloudFamily, migrateToCloud, joinFamily } from './store.js';
 import { THEMES, theme, themeId } from './themes.js';
 import { speak, say, setVoice, sound, confetti } from './fx.js';
 
@@ -38,18 +38,39 @@ const wishJar = w => (st().jarsEnabled ? (w.jar || 'save') : 'spend');
 // ---------- запуск ----------
 async function connect() {
   if (S.unwatch) S.unwatch();
-  S.data = null;
+  S.data = null; S.seenMe = false; S.seenFamily = false;
   render();
   try {
     S.store = await openStore(S.device.fid);
-    S.unwatch = S.store.watch(onData, err => { S.error = 'Немає доступу до даних: ' + err.message; render(); });
+    // записати пристрій у сім'ю (старі пристрої переходять на членство самі, поки старий код не закрито)
+    if (S.store.mode === 'cloud') await S.store.ensureMember({ role: S.device.role }).catch(() => {});
+    let retried = false;
+    S.unwatch = S.store.watch(onData, err => {
+      // правила оновили, поки застосунок був відкритий — пробуємо записатися й перепідключитись один раз
+      if (err?.code === 'permission-denied' && !retried) { retried = true; return S.store.ensureMember({ role: S.device.role }).then(connect, () => noAccess()); }
+      if (err?.code === 'permission-denied') return noAccess();
+      S.error = 'Немає доступу до даних: ' + err.message; render();
+    });
   } catch (e) {
     S.error = 'Не вдалося підключитися: ' + e.message;
     render();
   }
 }
 
+function noAccess() {
+  S.error = 'Цей пристрій від\'єднано від сім\'ї (або сім\'ю видалено). Щоб повернутись, попросіть код запрошення в батьківському режимі на іншому пристрої.';
+  S.noAccess = true; S.unwatch?.(); S.unwatch = null; S.data = null; render();
+}
+
 function onData(state) {
+  // пристрій відключили або сім'ю видалили, поки застосунок відкритий (активні слухачі правила не обривають)
+  if (state.members) {
+    const meIn = state.members.some(m => m.id === state.uid);
+    if (meIn) S.seenMe = true;
+    else if (S.seenMe) { S.seenMe = false; return noAccess(); }
+  }
+  if (state.family) S.seenFamily = true;
+  else if (S.seenFamily && state.family === null && state.members) { S.seenFamily = false; return noAccess(); }
   S.data = { ...state, settings: state.settings ? withDefaults(state.settings) : null, rawSettings: state.settings };
   S.error = null;
   if (state.settings && state.settings.heartsSince == null && !S.migratingHearts) {
@@ -80,7 +101,10 @@ function render() {
   if (!S.device) return renderOnboarding();
   if (S.error && !S.data) { $app.innerHTML = `<div class="center-screen"><div class="card pad"><p>${esc(S.error)}</p><button class="btn" data-a="retry">Спробувати ще</button> <button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button></div></div>`; return; }
   if (!S.data?.ready) { $app.innerHTML = `<div class="center-screen"><div class="loader">🪙</div></div>`; return; }
-  if (!S.data.rawSettings) { S.device = null; LS.del('mm.device'); return renderOnboarding(); }
+  if (!S.data.rawSettings) {
+    if (S.device.fid === 'local') { S.device = null; LS.del('mm.device'); return renderOnboarding(); }
+    return noAccess(); // сім'ю видалили з іншого пристрою
+  }
   document.documentElement.dataset.theme = themeId(st().theme);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme(st().theme).color);
   // зберегти прокрутку каруселей між перемальовуваннями
@@ -512,8 +536,7 @@ function pSettings() {
     <button class="btn big wide" type="submit">💾 Зберегти</button>
   </form>
   <fieldset><legend>Синхронізація</legend>
-    ${cloud ? `<p>☁️ Увімкнена. Код сім'ї для іншого пристрою:</p><div class="family-code">${S.device.fid.slice(0, 5)}-${S.device.fid.slice(5)}</div>
-      <p class="hint">На iPad або телефоні: відкрити застосунок → «У мене є код сім'ї» → ввести код. Код — як ключ від дому, не публікуйте його.</p>`
+    ${cloud ? syncBlock()
       : cloudAvailable ? `<p>Зараз дані лише на цьому пристрої.</p>
         <div class="btn-row"><button class="btn" data-a="migrate">☁️ Увімкнути синхронізацію</button><button class="btn ghost" data-a="join-code">🔗 Приєднатися за кодом</button></div>
         <p class="hint">«Увімкнути» — на пристрої з найсвіжішими даними (вони підуть у хмару). «Приєднатися» — на іншому: він візьме дані з хмари, а свої локальні відкладе.</p>`
@@ -526,12 +549,35 @@ function pSettings() {
   </fieldset>
   <fieldset><legend>Цей пристрій</legend>
     ${cloud ? seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"') : ''}
-    <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
+    <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати цей пристрій</button><button class="btn no" data-a="delete-family">🗑 Видалити сім'ю й усі дані</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
+    ${cloud ? `<p class="hint">«Видалити сім'ю» назавжди стирає з хмари всі справи, мрії, монетки й налаштування та від'єднує всі пристрої.</p>` : ''}
   </fieldset>
   <p class="hint center">Mini Money · v${window.MM_VERSION || ''}</p>`;
 }
 
 // ---------- ВІКНА ----------
+// Синхронізація: пристрої сім'ї, запрошення, старий код
+function syncBlock() {
+  const fam = S.data?.family, members = S.data?.members, me = S.data?.uid;
+  const oldCode = `${S.device.fid.slice(0, 5)}-${S.device.fid.slice(5)}`;
+  if (!members) {
+    // правила в хмарі ще старі — працює лише код сім'ї
+    return `<p>☁️ Увімкнена. Код сім'ї для іншого пристрою:</p><div class="family-code">${oldCode}</div>
+      <p class="hint">Код — як ключ від дому, не публікуйте його.</p>`;
+  }
+  const legacyOpen = fam && fam.legacy !== false;
+  const roleIcon = r => r === 'parent' ? '👨‍👩‍👧' : '🧒';
+  return `<p>☁️ Увімкнена. Пристрої сім'ї:</p>
+    <div class="dev-list">${members.slice().sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)).map(m => `<div class="dev-row">
+      <span class="dev-ic">${roleIcon(m.role)}</span><span class="dev-name"><b>${esc(m.label || 'Пристрій')}</b>${m.id === me ? ' <small>(цей)</small>' : ''}<small>з ${m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('uk-UA') : '—'}</small></span>
+      ${m.id === me ? '' : `<button class="btn small ghost" data-a="dev-remove" data-id="${m.id}">Відключити</button>`}</div>`).join('')}</div>
+    <div class="btn-row"><button class="btn" data-a="invite">➕ Додати пристрій</button></div>
+    <p class="hint">Новий пристрій: «У мене є код» → ввести одноразовий код запрошення (діє 30 хвилин).</p>
+    ${legacyOpen ? `<div class="legacy-box"><p>Старий код сім'ї ще діє: <b>${oldCode}</b></p>
+      <p class="hint">Коли всі ваші пристрої з'являться в списку вище — закрийте його, і далі приєднатись можна буде лише за запрошенням.</p>
+      <button class="btn ghost" data-a="close-legacy">🔒 Закрити старий код</button></div>` : ''}`;
+}
+
 function openModal(html, cls = '') {
   $modal.innerHTML = `<div class="modal-back" data-a="close"></div><div class="modal-card ${cls}">${html}</div>`;
   $modal.hidden = false;
@@ -889,7 +935,46 @@ const A = {
     if (!confirm('Скасувати цей запис? Баланс зміниться.')) return;
     await db([{ op: 'delete', col: 'ledger', id: el.dataset.id }]);
   },
-  async 'set-role'(el) { S.device = { ...S.device, role: el.value }; LS.set('mm.device', S.device); S.parent = false; S.preview = false; render(); },
+  async 'set-role'(el) {
+    S.device = { ...S.device, role: el.value }; LS.set('mm.device', S.device); S.parent = false; S.preview = false; render();
+    S.store?.updateMe?.({ role: el.value }).catch(() => {});
+  },
+  async invite() {
+    try {
+      const { code, exp } = await S.store.createInvite(30);
+      const pretty = `${code.slice(0, 4)}-${code.slice(4)}`;
+      openModal(`<button class="x" data-a="close">✕</button><h2>Код для нового пристрою</h2>
+        <div class="family-code">${pretty}</div>
+        <p class="hint">На новому iPad чи телефоні: відкрити Mini Money → «У мене є код» → ввести цей код. Діє до ${new Date(exp).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}, лише для вашої сім'ї.</p>
+        <div class="btn-row"><button class="btn big" data-a="close">Готово</button></div>`);
+    } catch (e) { toast('Не вдалося створити код: ' + e.message); }
+  },
+  async 'dev-remove'(el) {
+    const legacyOpen = S.data?.family && S.data.family.legacy !== false;
+    if (!confirm(legacyOpen ? 'Відключити пристрій? Разом із цим закриється старий код сім\'ї — інакше пристрій зможе підключитися знову. Решта пристроїв працюватиме далі.' : 'Відключити цей пристрій від сім\'ї? Він більше не бачитиме даних.')) return;
+    try {
+      if (legacyOpen) await S.store.closeLegacy();
+      await S.store.removeMember(el.dataset.id);
+      toast('Пристрій відключено');
+    } catch (e) { toast('Не вдалося: ' + e.message); }
+  },
+  async 'close-legacy'() {
+    const n = S.data?.members?.length || 0;
+    if (!confirm(`Закрити старий код? Підключені пристрої (${n}) працюватимуть далі, нові — лише за кодом запрошення.`)) return;
+    try { await S.store.closeLegacy(); toast('🔒 Старий код закрито'); } catch (e) { toast('Не вдалося: ' + e.message); }
+  },
+  async 'delete-family'() {
+    if (!confirm('Видалити сім\'ю? З хмари назавжди зникнуть усі справи, мрії, монетки й налаштування на ВСІХ пристроях.')) return;
+    if (prompt('Це не можна скасувати. Напишіть ВИДАЛИТИ') !== 'ВИДАЛИТИ') return;
+    try {
+      const st = S.store;
+      S.unwatch?.(); S.unwatch = null;
+      await st.deleteFamily();
+      LS.del('mm.data.local');
+      forgetDevice();
+      toast('Сім\'ю й усі дані видалено');
+    } catch (e) { toast('Не вдалося видалити: ' + e.message); connect(); }
+  },
   'forget-device'() {
     if (!confirm('Від\'єднати цей пристрій? Дані сім\'ї залишаться в хмарі, повернутись можна за кодом.')) return;
     forgetDevice();
@@ -902,7 +987,7 @@ const A = {
     if (!confirm('Перенести дані в хмару? Після цього можна буде підключити інший пристрій за кодом.')) return;
     try {
       const fid = randomCode(10);
-      await migrateToCloud(fid);
+      await migrateToCloud(fid, { role: S.device.role });
       S.device = { fid, role: S.device.role }; LS.set('mm.device', S.device);
       await connect();
       toast('☁️ Синхронізацію увімкнено');
@@ -1044,12 +1129,12 @@ async function onSubmit(form) {
     S.ob.step = 'library'; render();
   }
   if (kind === 'ob-join') {
-    const code = (f.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (code.length !== 10) return toast('Код має 10 символів');
-    try {
-      if (!(await cloudFamilyExists(code))) return toast('Такої сім\'ї не знайдено');
-    } catch (e) { return toast('Немає зв\'язку: ' + e.message); }
-    S.device = { fid: code, role: f.get('role') }; LS.set('mm.device', S.device);
+    const role = f.get('role');
+    let fid;
+    try { fid = await joinFamily(f.get('code') || '', { role }); }
+    catch (e) { return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
+    S.device = { fid, role }; LS.set('mm.device', S.device);
+    S.noAccess = false;
     connect();
   }
 }
@@ -1065,7 +1150,7 @@ function renderOnboarding() {
       <p class="ob-sub">Скарбничка для маленьких помічників: справи → монетки → мрії</p>
       <div class="btn-col">
         <button class="btn big" data-a="ob-step" data-v="create">✨ Почати</button>
-        ${cloudAvailable ? `<button class="btn ghost big" data-a="ob-step" data-v="join">🔗 У мене є код сім'ї</button>` : ''}
+        ${cloudAvailable ? `<button class="btn ghost big" data-a="ob-step" data-v="join">🔗 У мене є код</button>` : ''}
         <label class="btn ghost big">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>
       </div></div>`;
     return;
@@ -1097,8 +1182,8 @@ function renderOnboarding() {
   if (o.step === 'join') {
     $app.innerHTML = `<div class="center-screen ob"><form class="card pad ob-form" data-form="ob-join">
       <h2>Приєднатися до сім'ї</h2>
-      <p class="hint">Код є в батьківському режимі на іншому пристрої: Налаштування → Синхронізація.</p>
-      <label class="f">Код сім'ї<input name="code" required autocomplete="off" autocapitalize="characters" placeholder="ABCDE-FGH23" class="code-input"></label>
+      <p class="hint">Код запрошення: батьківський режим на іншому пристрої → Налаштування → Синхронізація → «➕ Додати пристрій».</p>
+      <label class="f">Код запрошення<input name="code" required autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" class="code-input"></label>
       <div class="f">Цей пристрій</div>${seg('role', 'child', [['child', '🧒 iPad дитини'], ['parent', '👨‍👩‍👧 Телефон батьків']])}
       <div class="btn-row"><button type="button" class="btn ghost" data-a="ob-step" data-v="welcome">Назад</button><button class="btn big" type="submit">Приєднатися</button></div>
     </form></div>`;
@@ -1121,7 +1206,7 @@ async function obCreate() {
   });
   try {
     let fid = 'local';
-    if (cloudAvailable) { fid = randomCode(10); const st = await createCloudFamily(fid); await st.batch(ops); }
+    if (cloudAvailable) { fid = randomCode(10); const st = await createCloudFamily(fid, { role: v.role || 'child' }); await st.batch(ops); }
     else { const st = await openStore('local'); await st.batch(ops); }
     S.device = { fid, role: v.role || 'child' }; LS.set('mm.device', S.device);
     S.ob = { step: 'welcome' };
