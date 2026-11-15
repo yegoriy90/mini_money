@@ -4,7 +4,7 @@ import {
   balances, total, taskState, currentStreak, approveOps, buyOps, cashOps, randomCode, uid, hashPin, vocative, plural, hearts, isDaily,
 } from './model.js';
 import { openStore, cloudAvailable, createCloudFamily, migrateToCloud, joinFamily } from './store.js';
-import { COMPANIONS, theme, themeId, applyColors, heroFull, heroHead } from './themes.js';
+import { COMPANIONS, theme, themeId, companion, applyColors, heroFull, heroHead, friendName, ageIndex } from './themes.js';
 import { speak, say, setVoice, sound, confetti } from './fx.js';
 import { isNative, pickPhoto, REMINDERS, getReminders, setReminders, applyReminders } from './native.js';
 
@@ -118,6 +118,7 @@ function render() {
   const keep = {};
   $app.querySelectorAll('[data-carousel]').forEach(c => { keep[c.dataset.carousel] = c.querySelector('.car-track').scrollLeft; });
   $app.innerHTML = (S.error ? `<div class="banner">${esc(S.error)}</div>` : '') + (isParentView() ? renderParent() : renderKid());
+  maybeGrewUp();
   $app.querySelectorAll('[data-carousel]').forEach(c => {
     const tr = c.querySelector('.car-track');
     if (keep[c.dataset.carousel]) tr.scrollLeft = keep[c.dataset.carousel];
@@ -146,10 +147,46 @@ function capacity(bal) {
 }
 
 // ---------- КОМПАНЬЙОНИ ----------
-function companionGrid(name, cur, action = '') {
-  return `<div class="comp-grid">${COMPANIONS.map(c => `<label class="comp" style="--c:${c.color};--cl:${c.light}">
+// друзі свого віку (+ уже обраний, навіть якщо він з іншого віку)
+function companionGrid(name, cur, action = '', age = companion(cur).age) {
+  const s = S.data?.settings, list = COMPANIONS.filter(c => c.age === age || c.id === cur);
+  return `<div class="comp-grid" data-grid="${name}" data-action="${action}">${list.map(c => `<label class="comp" style="--c:${c.color};--cl:${c.light}">
     <input type="radio" name="${name}" value="${c.id}"${c.id === cur ? ' checked' : ''}${action ? ` data-a="${action}"` : ''}>
-    <span class="comp-pic">${heroHead(c)}</span><b>${c.name}</b></label>`).join('')}</div>`;
+    <span class="comp-pic">${heroHead(c)}</span><b>${esc(friendName(c, s))}</b></label>`).join('')}</div>`;
+}
+// зміна віку у формі (онбординг, налаштування) — показати друзів цього віку
+function regridCompanions(form, age) {
+  const g = form?.querySelector('.comp-grid[data-grid]');
+  if (!g) return;
+  let cur = g.querySelector('input:checked')?.value;
+  if (!cur || companion(cur).age !== age) cur = COMPANIONS.find(c => c.age === age)?.id || cur;
+  g.outerHTML = companionGrid(g.dataset.grid, cur, g.dataset.action, age);
+  if (g.dataset.action === 'ob-companion') applyColors(cur);
+}
+// вікно вибору друга: зверху — теперішній друг і його ім'я, нижче — друзі за віком
+function pickCompanion(age, grew = false) {
+  const s = st(), cur = companion(s.theme), nm = esc(friendName(cur, s));
+  age ||= grew ? s.ageGroup : cur.age;
+  const ages = AGE_GROUPS.filter(a => COMPANIONS.some(c => c.age === a.id));
+  openModal(`<button class="x" data-a="close">✕</button>
+    ${grew ? `<h2>${isF() ? 'Ти підросла' : 'Ти підріс'}! 🎉</h2><p class="comp-lead">Тепер з тобою хочуть дружити нові герої. А ${nm} теж нікуди не дінеться — обирай ${isF() ? "сама" : "сам"}.</p>` : '<h2>Обери друга 💫</h2>'}
+    <div class="friend-now" style="--c:${cur.color}"><span class="fn-pic">${heroHead(cur)}</span>
+      <span class="fn-txt"><b>${nm}</b><small>${cur.who}${nm !== cur.name ? ` · ${cur.name}` : ''}</small></span>
+      <button type="button" class="btn sm ghost" data-a="rename-friend">✏️ Ім'я</button></div>
+    <div class="seg comp-ages">${ages.map(a => `<label><input type="radio" name="compAge" ${a.id === age ? 'checked' : ''} data-a="comp-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>
+    <div class="comp-grid big">${COMPANIONS.filter(c => c.age === age).map(c => `<button class="comp${c.id === cur.id ? ' on' : ''}" style="--c:${c.color};--cl:${c.light}" data-a="set-companion" data-id="${c.id}">
+      <span class="comp-pic">${heroFull(c)}</span><b>${esc(friendName(c, s))}</b><small>${c.who}</small></button>`).join('')}</div>`, 'comp-modal');
+}
+// коли батьки змінили вік, а друг лишився «молодшим» — один раз запропонувати нових
+function maybeGrewUp() {
+  const s = st();
+  if (isParentView() || S.grewAsked || s.friendAgeSeen === s.ageGroup || ageIndex(companion(s.theme).age) >= ageIndex(s.ageGroup)) return;
+  setTimeout(() => {
+    if (!$modal.hidden || S.grewAsked || isParentView()) return;
+    S.grewAsked = true;
+    pickCompanion(s.ageGroup, true);
+    db([{ op: 'update', col: 'meta', id: 'settings', data: { friendAgeSeen: s.ageGroup } }]);
+  }, 900);
 }
 
 // ---------- ДИТЯЧИЙ ЕКРАН ----------
@@ -160,7 +197,7 @@ function renderKid() {
   const views = { tasks: kidTasks, dreams: kidDreams, progress: kidProgress };
   return `<div class="kid">
     <header class="kid-top">
-      <button class="mascot m1" data-a="pick-companion" aria-label="Обрати друга">${th.mascots[0]}</button>
+      <button class="mascot m1" data-a="pick-companion" aria-label="${esc(friendName(companion(s.theme), s))} — обрати друга">${th.mascots[0]}</button>
       <div class="hello"><h1>Привіт, ${esc(s.childVoc || s.childName)}!</h1>
         <div class="sub">${new Date().toLocaleDateString('uk-UA', { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <button class="total-pill" data-a="say-total">${coinIcon()}<b>${num(fromK(total(bal), s))}</b></button>
@@ -522,7 +559,7 @@ function pSettings() {
       <div class="f">Вік (набір завдань у бібліотеці)</div>${seg('ageGroup', s.ageGroup, AGE_GROUPS.map(a => [a.id, a.title]))}
     </fieldset>
     <fieldset><legend>Оформлення</legend>
-      <div class="f">Друг-компаньйон (від нього залежать кольори)</div>${companionGrid('theme', themeId(s.theme))}
+      <div class="f">Друг-компаньйон (від нього залежать кольори)</div>${companionGrid('theme', themeId(s.theme), '', s.ageGroup)}
     </fieldset>
     <fieldset><legend>Гроші</legend>
       ${seg('currency', s.currency, [['coins', '🪙 Монетки'], ['uah', '₴ Гривні']])}
@@ -613,6 +650,13 @@ function openModal(html, cls = '') {
 function closeModal() {
   $modal.hidden = true; $modal.innerHTML = ''; M = {};
   document.body.classList.remove('modal-open');
+}
+
+async function saveFriendName(raw) {
+  const s = st(), c = companion(s.theme), name = String(raw || '').trim().slice(0, 16);
+  closeModal(); sound.done();
+  await db([{ op: 'update', col: 'meta', id: 'settings', data: { friendNames: { ...(s.friendNames || {}), [c.id]: name === c.name ? '' : name } } }]);
+  if (name && name !== c.name) { confetti(30); toast(`Тепер друга звати ${name}!`); }
 }
 
 function toast(msg) {
@@ -797,6 +841,7 @@ function checkCelebrate() {
         : `<div class="cele-hero"><div class="cele-glow"></div>${th.full[0]}<i class="cele-coin">${sum ? coinIcon() : '❤️'}</i></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
+      <div class="cele-friend">${esc(friendName(companion(s.theme), s))} радіє разом з тобою</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
       ${newSticker ? `<div class="cele-sticker"><img src="${newSticker.img}" alt="">Нова наліпка!</div>` : ''}
       <div class="cele-list">${items.map(x => `<span>${x}</span>`).join('')}</div>
@@ -869,13 +914,21 @@ const A = {
   'say-sticker'(el) { Number(el.dataset.i) < stickers().count ? sayF('sticker_mine', 'Це твоя наліпка!') : sayF('sticker_soon', 'Роби справи — і буде нова наліпка!'); },
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data), left = h.per - h.now; sayF(left <= 5 ? `hearts_left_${left}` : 'price_heart', 'Збирай сердечка — і буде монетка!'); },
-  'pick-companion'() {
+  'pick-companion'() { sound.tap(); pickCompanion(); },
+  'comp-age'(el) { sound.tap(); pickCompanion(el.dataset.v); },
+  'rename-friend'() {
     sound.tap();
-    const cur = themeId(st().theme);
-    openModal(`<button class="x" data-a="close">✕</button><h2>Обери друга 💫</h2>
-      <div class="comp-grid big">${COMPANIONS.map(c => `<button class="comp${c.id === cur ? ' on' : ''}" style="--c:${c.color};--cl:${c.light}" data-a="set-companion" data-id="${c.id}">
-        <span class="comp-pic">${heroFull(c)}</span><b>${c.name}</b><small>${c.who}</small></button>`).join('')}</div>`, 'comp-modal');
+    const s = st(), c = companion(s.theme);
+    openModal(`<button class="x" data-a="close">✕</button><h2>Як звати друга?</h2>
+      <form data-form="friend-name" class="friend-form" style="--c:${c.color}">
+        <span class="fn-pic big">${heroHead(c)}</span>
+        <input name="fname" maxlength="16" value="${esc(friendName(c, s))}" placeholder="${c.name}" autocomplete="off" enterkeyhint="done" aria-label="Ім'я друга">
+        <button class="btn">Зберегти</button>
+        ${friendName(c, s) !== c.name ? `<button type="button" class="btn ghost" data-a="friend-name-reset">Повернути «${c.name}»</button>` : ''}
+      </form>`, 'name-modal');
+    setTimeout(() => $modal.querySelector('input[name="fname"]')?.select(), 60);
   },
+  async 'friend-name-reset'() { await saveFriendName(''); },
   async 'set-companion'(el) {
     closeModal(); sound.done(); confetti(40);
     await db([{ op: 'update', col: 'meta', id: 'settings', data: { theme: el.dataset.id } }]);
@@ -1119,6 +1172,7 @@ async function approveMany(list) {
 // ---------- ФОРМИ ----------
 async function onSubmit(form) {
   const f = new FormData(form), kind = form.dataset.form, s = S.data?.settings;
+  if (kind === 'friend-name') return saveFriendName(f.get('fname'));
   if (kind === 'settings') {
     const pct = Object.fromEntries(JARS.map(j => [j, Math.max(0, Math.round(Number(f.get('pct_' + j)) || 0))]));
     const jarsEnabled = f.get('jarsEnabled') === 'on';
@@ -1221,7 +1275,7 @@ function renderOnboarding() {
       <label class="f">Як звертатись: «Привіт, …!»<input name="childVoc" value="${esc(v.childVoc || '')}" autocomplete="off"></label>
       ${seg('gender', v.gender || 'f', [['f', 'Дівчинка'], ['m', 'Хлопчик']])}
       <div class="f">Вік</div>${seg('ageGroup', v.ageGroup || '4-5', AGE_GROUPS.map(a => [a.id, a.title]))}
-      <div class="f">Обери друга — він буде поруч і дасть свій колір</div>${companionGrid('theme', v.theme || 'flopi', 'ob-companion')}
+      <div class="f">Обери друга — він буде поруч і дасть свій колір</div>${companionGrid('theme', v.theme || COMPANIONS.find(c => c.age === (v.ageGroup || '4-5')).id, 'ob-companion', v.ageGroup || '4-5')}
       <label class="f">PIN-код батьків (4 цифри)<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off"></label>
       <p class="hint">PIN відкриває батьківський режим: підтвердження справ, ціни, налаштування. На дитячому екрані — утримати 🔒.</p>
       ${cloudAvailable ? `<div class="f">Цей пристрій</div>${seg('role', v.role || 'child', [['child', '🧒 iPad дитини'], ['parent', '👨‍👩‍👧 Телефон батьків']])}` : ''}
@@ -1301,6 +1355,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
+  if (el.name === 'ageGroup' && el.form) regridCompanions(el.form, el.value);
   if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
   if (el.dataset.change === 'photo' && el.files?.[0]) setWishPhoto(el.files[0]);
 });
