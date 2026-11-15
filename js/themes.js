@@ -1,6 +1,6 @@
 // Компаньйони: дитина обирає друга, і від нього залежить оформлення (колір фону, кнопок, навігації).
 // Флопі й Мусі — за улюбленими іграшками Мії; решта — власні оригінальні плюшеві герої (Magnific).
-// Картинки: assets/heroes/<img>.webp (повний зріст) і <img>-head.webp (голівка), прозорий фон.
+// Картинки: assets/heroes/<img>.webp (повний зріст) і <img>-avatar.webp (квадратний аватар з усією головою — tools/make_avatars.py), прозорий фон.
 
 const emoji = e => `<span class="emoji-mascot" aria-hidden="true">${e}</span>`;
 const img = (src, cls = '') => `<img class="hero-img ${cls}" src="${src}" alt="" draggable="false">`;
@@ -28,7 +28,7 @@ export function themeId(id) { return BY_ID[id] ? id : (LEGACY[id] || 'flopi'); }
 export function companion(id) { return BY_ID[themeId(id)]; }
 
 export const heroFull = c => img(`assets/heroes/${c.img}.webp`, c.id);
-export const heroHead = c => img(`assets/heroes/${c.img}-head.webp`, `${c.id} head`);
+export const heroHead = c => img(`assets/heroes/${c.img}-avatar.webp`, `${c.id} head`);
 
 // Усе, що потрібно екранам, з обраного компаньйона
 export function theme(id) {
