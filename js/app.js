@@ -551,7 +551,7 @@ function pSettings() {
     ${cloud ? '' : `<label class="btn ghost">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>`}</div>
   </fieldset>
   <fieldset><legend>Цей пристрій</legend>
-    ${cloud ? seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"') : ''}
+    ${seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"')}
     <div class="btn-row">${cloud ? `<button class="btn ghost" data-a="forget-device">Від'єднати цей пристрій</button><button class="btn no" data-a="delete-family">🗑 Видалити сім'ю й усі дані</button>` : `<button class="btn no" data-a="wipe-local">Видалити всі дані</button>`}</div>
     ${cloud ? `<p class="hint">«Видалити сім'ю» назавжди стирає з хмари всі справи, мрії, монетки й налаштування та від'єднує всі пристрої.</p>` : ''}
   </fieldset>
