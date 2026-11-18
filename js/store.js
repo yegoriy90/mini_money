@@ -66,7 +66,8 @@ function loadFirebase() {
       : auth.getAuth(a);
     let db;
     try {
-      db = fs.initializeFirestore(a, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+      // у вебв'ю iOS потокове з'єднання Firestore часом «зависає» — SDK сам перемикається на long polling
+      db = fs.initializeFirestore(a, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
     } catch { db = fs.getFirestore(a); }
     // для локальної розробки: firebaseConfig.emulator = 'localhost'
     if (firebaseConfig.emulator) {
@@ -195,14 +196,16 @@ export async function createCloudFamily(fid, info = {}) {
 }
 
 // Приєднатися: спершу як код запрошення, потім — як старий код сім'ї (перехідний режим)
-export async function joinFamily(raw, info = {}) {
+export async function joinFamily(raw, info = {}, step = () => {}) {
   const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  step('Перевіряємо код…');
   const probe = await new CloudStore('_').open();
   if (c.length === 8) {
     const inv = await probe.fs.getDoc(probe.fs.doc(probe.db, 'invites', c));
     if (!inv.exists()) throw new Error('Такого коду немає — попросіть новий');
     const { fid, exp } = inv.data();
     if (exp < Date.now()) throw new Error('Код уже не діє — попросіть новий');
+    step('Записуємо пристрій…');
     const s = await new CloudStore(fid).open();
     await s.ensureMember(info, c);
     return fid;
