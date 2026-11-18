@@ -42,7 +42,9 @@ const SITE = location.protocol === 'capacitor:' ? 'https://yegoriy90.github.io/m
 // ---------- запуск ----------
 async function connect() {
   if (S.unwatch) S.unwatch();
-  S.data = null; S.seenMe = false; S.seenFamily = false;
+  S.data = null; S.seenMe = false; S.seenFamily = false; S.slow = false;
+  clearTimeout(S.slowT);
+  S.slowT = setTimeout(() => { if (!S.data?.ready) { S.slow = true; render(); } }, 15000);
   render();
   try {
     S.store = await openStore(S.device.fid);
@@ -105,7 +107,12 @@ function onData(state) {
 function render() {
   if (!S.device) return renderOnboarding();
   if (S.error && !S.data) { $app.innerHTML = `<div class="center-screen"><div class="card pad"><p>${esc(S.error)}</p><button class="btn" data-a="retry">Спробувати ще</button> <button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button></div></div>`; return; }
-  if (!S.data?.ready) { $app.innerHTML = `<div class="center-screen"><div class="loader">🪙</div></div>`; return; }
+  if (!S.data?.ready) {
+    $app.innerHTML = S.slow
+      ? `<div class="center-screen"><div class="card pad slow-card"><div class="loader">🪙</div><p>Все ще завантажуємо дані сім'ї. Перший раз це може тривати довше — перевірте інтернет (Wi-Fi) і трохи зачекайте.</p><button class="btn ghost" data-a="forget-device">Скасувати й почати спочатку</button></div></div>`
+      : `<div class="center-screen"><div class="loader">🪙</div><p class="hint">${esc(S.loadMsg || 'Завантажуємо дані…')}</p></div>`;
+    return;
+  }
   if (!S.data.rawSettings) {
     if (S.device.fid === 'local') { S.device = null; LS.del('mm.device'); return renderOnboarding(); }
     return noAccess(); // сім'ю видалили з іншого пристрою
@@ -163,17 +170,20 @@ function regridCompanions(form, age) {
   g.outerHTML = companionGrid(g.dataset.grid, cur, g.dataset.action, age);
   if (g.dataset.action === 'ob-companion') applyColors(cur);
 }
+// усі вікові групи друзів — лише з батьківським доступом (телефон батьків або розблокований режим батьків);
+// дитина на своєму пристрої бачить друзів тільки своєї групи
+const canAllAges = () => !!S.device && (S.parent || S.device.role === 'parent');
 // вікно вибору друга: зверху — теперішній друг і його ім'я, нижче — друзі за віком
 function pickCompanion(age, grew = false) {
-  const s = st(), cur = companion(s.theme), nm = esc(friendName(cur, s));
-  age ||= grew ? s.ageGroup : cur.age;
-  const ages = AGE_GROUPS.filter(a => COMPANIONS.some(c => c.age === a.id));
+  const s = st(), cur = companion(s.theme), nm = esc(friendName(cur, s)), free = canAllAges();
+  age = free ? (age || (grew ? s.ageGroup : cur.age)) : s.ageGroup;
+  const ages = free ? AGE_GROUPS.filter(a => COMPANIONS.some(c => c.age === a.id)) : [];
   openModal(`<button class="x" data-a="close">✕</button>
-    ${grew ? `<h2>${isF() ? 'Ти підросла' : 'Ти підріс'}! 🎉</h2><p class="comp-lead">Тепер з тобою хочуть дружити нові герої. А ${nm} теж нікуди не дінеться — обирай ${isF() ? "сама" : "сам"}.</p>` : '<h2>Обери друга 💫</h2>'}
+    ${grew ? `<h2>${isF() ? 'Ти підросла' : 'Ти підріс'}! 🎉</h2><p class="comp-lead">Тепер з тобою хочуть дружити нові герої. Обери когось нового — або лишайся з ${nm}.</p>` : '<h2>Обери друга 💫</h2>'}
     <div class="friend-now" style="--c:${cur.color}"><span class="fn-pic">${heroHead(cur)}</span>
       <span class="fn-txt"><b>${nm}</b><small>${cur.who}${nm !== cur.name ? ` · ${cur.name}` : ''}</small></span>
       <button type="button" class="btn sm ghost" data-a="rename-friend">✏️ Ім'я</button></div>
-    <div class="seg comp-ages">${ages.map(a => `<label><input type="radio" name="compAge" ${a.id === age ? 'checked' : ''} data-a="comp-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>
+    ${ages.length ? `<div class="seg comp-ages">${ages.map(a => `<label><input type="radio" name="compAge" ${a.id === age ? 'checked' : ''} data-a="comp-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>` : ''}
     <div class="comp-grid big">${COMPANIONS.filter(c => c.age === age).map(c => `<button class="comp${c.id === cur.id ? ' on' : ''}" style="--c:${c.color};--cl:${c.light}" data-a="set-companion" data-id="${c.id}">
       <span class="comp-pic">${heroFull(c)}</span><b>${esc(friendName(c, s))}</b><small>${c.who}</small></button>`).join('')}</div>`, 'comp-modal');
 }
@@ -559,7 +569,7 @@ function pSettings() {
       <div class="f">Вік (набір завдань у бібліотеці)</div>${seg('ageGroup', s.ageGroup, AGE_GROUPS.map(a => [a.id, a.title]))}
     </fieldset>
     <fieldset><legend>Оформлення</legend>
-      <div class="f">Друг-компаньйон (від нього залежать кольори)</div>${companionGrid('theme', themeId(s.theme), '', s.ageGroup)}
+      <div class="f">Друг-компаньйон (від нього залежать кольори)</div><div class="seg comp-ages">${AGE_GROUPS.map(a => `<label><input type="radio" name="gridAge" value="${a.id}"${a.id === s.ageGroup ? ' checked' : ''}><span>${a.title}</span></label>`).join('')}</div>${companionGrid('theme', themeId(s.theme), '', s.ageGroup)}
     </fieldset>
     <fieldset><legend>Гроші</legend>
       ${seg('currency', s.currency, [['coins', '🪙 Монетки'], ['uah', '₴ Гривні']])}
@@ -583,7 +593,7 @@ function pSettings() {
     <fieldset><legend>PIN-код батьків</legend>
       <label class="f">Новий PIN (4 цифри, порожньо — не міняти)<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off"></label>
     </fieldset>
-    <button class="btn big wide" type="submit">💾 Зберегти</button>
+    <button class="btn big wide" type="submit">💾 Зберегти налаштування</button>
   </form>
   <fieldset><legend>Синхронізація</legend>
     ${cloud ? syncBlock()
@@ -592,10 +602,12 @@ function pSettings() {
         <p class="hint">«Увімкнути» — на пристрої з найсвіжішими даними (вони підуть у хмару). «Приєднатися» — на іншому: він візьме дані з хмари, а свої локальні відкладе.</p>`
       : `<p class="hint">Дані зберігаються лише на цьому пристрої. Щоб підтверджувати справи з телефона, треба один раз налаштувати Firebase (див. README).</p>`}
   </fieldset>
-  <fieldset><legend>Перенести на інший пристрій</legend>
-    <p class="hint">Без синхронізації: збережіть файл-копію і відкрийте його на iPad (Telegram, пошта, iCloud чи Google Drive → «Зберегти у Файли»). Після перенесення користуйтеся одним пристроєм — копії між собою не синхронізуються.</p>
-    <div class="btn-row"><button class="btn" data-a="export">📤 Зберегти копію</button>
-    ${cloud ? '' : `<label class="btn ghost">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>`}</div>
+  <fieldset><legend>Копія даних (файл)</legend>
+    ${cloud
+      ? `<p class="hint">«Зберегти копію» — файл з усіма даними сім'ї (на випадок збою). «Завантажити копію з файлу» — додати в сім'ю дані зі старого пристрою: додадуться лише записи, яких тут ще немає; нічого не замінюється й не видаляється, налаштування (PIN, курс, ім'я) не змінюються.</p>`
+      : `<p class="hint">Без синхронізації: збережіть файл-копію і відкрийте його на іншому пристрої (Telegram, пошта, iCloud чи Google Drive → «Зберегти у Файли»). Після перенесення користуйтеся одним пристроєм — копії між собою не синхронізуються.</p>`}
+    <div class="btn-row"><button class="btn" data-a="export">📤 Зберегти копію у файл</button>
+    <label class="btn ghost">📥 Завантажити копію з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label></div>
   </fieldset>
   <fieldset><legend>Цей пристрій</legend>
     ${seg('role', S.device.role, [['child', '🧒 Дитячий (iPad)'], ['parent', '👨‍👩‍👧 Батьківський']]).replace(/name="role"/g, 'name="role" data-a="set-role"')}
@@ -915,7 +927,7 @@ const A = {
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data), left = h.per - h.now; sayF(left <= 5 ? `hearts_left_${left}` : 'price_heart', 'Збирай сердечка — і буде монетка!'); },
   'pick-companion'() { sound.tap(); pickCompanion(); },
-  'comp-age'(el) { sound.tap(); pickCompanion(el.dataset.v); },
+  'comp-age'(el) { if (!canAllAges()) return; sound.tap(); pickCompanion(el.dataset.v); },
   'rename-friend'() {
     sound.tap();
     const s = st(), c = companion(s.theme);
@@ -930,6 +942,7 @@ const A = {
   },
   async 'friend-name-reset'() { await saveFriendName(''); },
   async 'set-companion'(el) {
+    if (!canAllAges() && COMPANIONS.find(c => c.id === el.dataset.id)?.age !== st().ageGroup) return;
     closeModal(); sound.done(); confetti(40);
     await db([{ op: 'update', col: 'meta', id: 'settings', data: { theme: el.dataset.id } }]);
   },
@@ -1134,6 +1147,7 @@ async function importData(file) {
   try { data = JSON.parse(await file.text()); } catch { return toast('Це не файл Mini Money'); }
   const cols = data?.cols;
   if (data?.app !== 'mini-money' || !cols?.meta?.settings) return toast('Це не файл Mini Money');
+  if (S.store?.mode === 'cloud') return importIntoCloud(cols);
   if (S.device && !confirm('Замінити всі дані на цьому пристрої даними з файлу?')) return;
   try { localStorage.setItem('mm.data.local', JSON.stringify(cols)); } catch { return toast('Не вистачає місця на пристрої'); }
   // не показувати святкування за старі монетки
@@ -1145,6 +1159,24 @@ async function importData(file) {
   await connect();
   toast('📥 Дані відкрито');
   sayF('hello', 'Привіт! Давай збирати монетки!');
+}
+
+// Пристрій у хмарній сім'ї: додаємо з файлу лише те, чого тут ще немає (за id) — нічого не замінюємо й не видаляємо
+async function importIntoCloud(cols) {
+  const NAMES = { tasks: 'справ', wishes: 'мрій', completions: 'виконань', ledger: 'записів про монетки' };
+  const ops = [], counts = [];
+  for (const col of Object.keys(NAMES)) {
+    const have = new Set(S.data[col].map(x => x.id)), add = Object.entries(cols[col] || {}).filter(([id]) => !have.has(id));
+    add.forEach(([id, d]) => ops.push({ op: 'set', col, id, data: d }));
+    if (add.length) counts.push(`${add.length} ${NAMES[col]}`);
+  }
+  if (!ops.length) return toast('У файлі немає нічого нового: усе вже є в сім\'ї');
+  if (!confirm(`Додати в сім'ю з файлу: ${counts.join(', ')}?\nТе, що вже є, не зміниться.`)) return;
+  // не показувати святкування за старі монетки з файлу
+  const maxTs = Object.values(cols.ledger || {}).reduce((m, e) => Math.max(m, e.ts || 0), 0);
+  S.celebrated = Math.max(S.celebrated || 0, maxTs); LS.set('mm.celebrated', S.celebrated);
+  await db(ops);
+  toast(`📥 Додано: ${counts.join(', ')}`);
 }
 
 function forgetDevice() {
@@ -1242,10 +1274,10 @@ async function onSubmit(form) {
     let fid;
     const btn = form.querySelector('[type=submit]'), label = btn?.textContent;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Зачекайте…'; }
-    try { fid = await joinFamily(f.get('code') || '', { role }); }
+    try { fid = await joinFamily(f.get('code') || '', { role }, m => { if (btn) btn.textContent = '⏳ ' + m; }); }
     catch (e) { if (btn) { btn.disabled = false; btn.textContent = label; } return toast(e.code === 'unavailable' ? 'Немає зв\'язку з інтернетом' : e.code === 'permission-denied' ? 'Код не підходить — попросіть новий код запрошення' : e.message); }
     S.device = { fid, role }; LS.set('mm.device', S.device);
-    S.noAccess = false;
+    S.noAccess = false; S.loadMsg = 'Завантажуємо дані сім\'ї…';
     connect();
   }
 }
@@ -1263,7 +1295,7 @@ function renderOnboarding() {
       <div class="btn-col">
         <button class="btn big" data-a="ob-step" data-v="create">✨ Почати</button>
         ${cloudAvailable ? `<button class="btn ghost big" data-a="ob-step" data-v="join">🔗 У мене є код</button>` : ''}
-        <label class="btn ghost big">📥 Відкрити з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>
+        <label class="btn ghost big">📥 Завантажити копію з файлу<input type="file" accept=".json,application/json" data-change="import" hidden></label>
       </div></div>`;
     return;
   }
@@ -1355,7 +1387,8 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
-  if (el.name === 'ageGroup' && el.form) regridCompanions(el.form, el.value);
+  if (el.name === 'ageGroup' && el.form) { const g = el.form.querySelector(`input[name="gridAge"][value="${el.value}"]`); if (g) g.checked = true; regridCompanions(el.form, el.value); }
+  if (el.name === 'gridAge' && el.form) regridCompanions(el.form, el.value);
   if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
   if (el.dataset.change === 'photo' && el.files?.[0]) setWishPhoto(el.files[0]);
 });

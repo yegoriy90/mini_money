@@ -342,3 +342,8 @@ fieldset legend { font-size: 13px; font-weight: 600; color: var(--muted); text-t
 .lib-item.on { background: var(--tint); box-shadow: inset 0 0 0 2px var(--accent); }
 .lib-item b { font-weight: 600; }
 .p-jar { border-top: 0; border-radius: var(--r-lg); padding: 16px; }
+
+/* довге завантаження */
+.slow-card { width: min(420px, 100%); box-sizing: border-box; text-align: center; }
+.slow-card .loader { font-size: 48px; display: block; width: 48px; margin: 0 auto 8px; }
+.center-screen > .hint { text-align: center; max-width: 320px; }
