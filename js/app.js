@@ -170,17 +170,20 @@ function regridCompanions(form, age) {
   g.outerHTML = companionGrid(g.dataset.grid, cur, g.dataset.action, age);
   if (g.dataset.action === 'ob-companion') applyColors(cur);
 }
+// усі вікові групи друзів — лише з батьківським доступом (телефон батьків або розблокований режим батьків);
+// дитина на своєму пристрої бачить друзів тільки своєї групи
+const canAllAges = () => !!S.device && (S.parent || S.device.role === 'parent');
 // вікно вибору друга: зверху — теперішній друг і його ім'я, нижче — друзі за віком
 function pickCompanion(age, grew = false) {
-  const s = st(), cur = companion(s.theme), nm = esc(friendName(cur, s));
-  age ||= grew ? s.ageGroup : cur.age;
-  const ages = AGE_GROUPS.filter(a => COMPANIONS.some(c => c.age === a.id));
+  const s = st(), cur = companion(s.theme), nm = esc(friendName(cur, s)), free = canAllAges();
+  age = free ? (age || (grew ? s.ageGroup : cur.age)) : s.ageGroup;
+  const ages = free ? AGE_GROUPS.filter(a => COMPANIONS.some(c => c.age === a.id)) : [];
   openModal(`<button class="x" data-a="close">✕</button>
-    ${grew ? `<h2>${isF() ? 'Ти підросла' : 'Ти підріс'}! 🎉</h2><p class="comp-lead">Тепер з тобою хочуть дружити нові герої. А ${nm} теж нікуди не дінеться — обирай ${isF() ? "сама" : "сам"}.</p>` : '<h2>Обери друга 💫</h2>'}
+    ${grew ? `<h2>${isF() ? 'Ти підросла' : 'Ти підріс'}! 🎉</h2><p class="comp-lead">Тепер з тобою хочуть дружити нові герої. Обери когось нового — або лишайся з ${nm}.</p>` : '<h2>Обери друга 💫</h2>'}
     <div class="friend-now" style="--c:${cur.color}"><span class="fn-pic">${heroHead(cur)}</span>
       <span class="fn-txt"><b>${nm}</b><small>${cur.who}${nm !== cur.name ? ` · ${cur.name}` : ''}</small></span>
       <button type="button" class="btn sm ghost" data-a="rename-friend">✏️ Ім'я</button></div>
-    <div class="seg comp-ages">${ages.map(a => `<label><input type="radio" name="compAge" ${a.id === age ? 'checked' : ''} data-a="comp-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>
+    ${ages.length ? `<div class="seg comp-ages">${ages.map(a => `<label><input type="radio" name="compAge" ${a.id === age ? 'checked' : ''} data-a="comp-age" data-v="${a.id}"><span>${a.title}</span></label>`).join('')}</div>` : ''}
     <div class="comp-grid big">${COMPANIONS.filter(c => c.age === age).map(c => `<button class="comp${c.id === cur.id ? ' on' : ''}" style="--c:${c.color};--cl:${c.light}" data-a="set-companion" data-id="${c.id}">
       <span class="comp-pic">${heroFull(c)}</span><b>${esc(friendName(c, s))}</b><small>${c.who}</small></button>`).join('')}</div>`, 'comp-modal');
 }
@@ -566,7 +569,7 @@ function pSettings() {
       <div class="f">Вік (набір завдань у бібліотеці)</div>${seg('ageGroup', s.ageGroup, AGE_GROUPS.map(a => [a.id, a.title]))}
     </fieldset>
     <fieldset><legend>Оформлення</legend>
-      <div class="f">Друг-компаньйон (від нього залежать кольори)</div>${companionGrid('theme', themeId(s.theme), '', s.ageGroup)}
+      <div class="f">Друг-компаньйон (від нього залежать кольори)</div><div class="seg comp-ages">${AGE_GROUPS.map(a => `<label><input type="radio" name="gridAge" value="${a.id}"${a.id === s.ageGroup ? ' checked' : ''}><span>${a.title}</span></label>`).join('')}</div>${companionGrid('theme', themeId(s.theme), '', s.ageGroup)}
     </fieldset>
     <fieldset><legend>Гроші</legend>
       ${seg('currency', s.currency, [['coins', '🪙 Монетки'], ['uah', '₴ Гривні']])}
@@ -924,7 +927,7 @@ const A = {
   'rep-week'(el) { S.repWeek = Math.max(0, (S.repWeek || 0) + Number(el.dataset.d)); render(); },
   'say-hearts'() { const h = hearts(S.data), left = h.per - h.now; sayF(left <= 5 ? `hearts_left_${left}` : 'price_heart', 'Збирай сердечка — і буде монетка!'); },
   'pick-companion'() { sound.tap(); pickCompanion(); },
-  'comp-age'(el) { sound.tap(); pickCompanion(el.dataset.v); },
+  'comp-age'(el) { if (!canAllAges()) return; sound.tap(); pickCompanion(el.dataset.v); },
   'rename-friend'() {
     sound.tap();
     const s = st(), c = companion(s.theme);
@@ -939,6 +942,7 @@ const A = {
   },
   async 'friend-name-reset'() { await saveFriendName(''); },
   async 'set-companion'(el) {
+    if (!canAllAges() && COMPANIONS.find(c => c.id === el.dataset.id)?.age !== st().ageGroup) return;
     closeModal(); sound.done(); confetti(40);
     await db([{ op: 'update', col: 'meta', id: 'settings', data: { theme: el.dataset.id } }]);
   },
@@ -1383,7 +1387,8 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const el = e.target;
   if (el.matches('input[data-a]')) { const fn = A[el.dataset.a]; if (fn) fn(el, e); }
-  if (el.name === 'ageGroup' && el.form) regridCompanions(el.form, el.value);
+  if (el.name === 'ageGroup' && el.form) { const g = el.form.querySelector(`input[name="gridAge"][value="${el.value}"]`); if (g) g.checked = true; regridCompanions(el.form, el.value); }
+  if (el.name === 'gridAge' && el.form) regridCompanions(el.form, el.value);
   if (el.dataset.change === 'import' && el.files?.[0]) { importData(el.files[0]); el.value = ''; }
   if (el.dataset.change === 'photo' && el.files?.[0]) setWishPhoto(el.files[0]);
 });
