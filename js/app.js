@@ -109,8 +109,8 @@ function render() {
   if (S.error && !S.data) { $app.innerHTML = `<div class="center-screen"><div class="card pad"><p>${esc(S.error)}</p><button class="btn" data-a="retry">Спробувати ще</button> <button class="btn ghost" data-a="forget-device">Від'єднати пристрій</button></div></div>`; return; }
   if (!S.data?.ready) {
     $app.innerHTML = S.slow
-      ? `<div class="center-screen"><div class="card pad slow-card"><div class="loader">🪙</div><p>Все ще завантажуємо дані сім'ї. Перший раз це може тривати довше — перевірте інтернет (Wi-Fi) і трохи зачекайте.</p><button class="btn ghost" data-a="forget-device">Скасувати й почати спочатку</button></div></div>`
-      : `<div class="center-screen"><div class="loader">🪙</div><p class="hint">${esc(S.loadMsg || 'Завантажуємо дані…')}</p></div>`;
+      ? `<div class="center-screen"><div class="card pad slow-card"><div class="loader"><i class="coin"></i></div><p>Все ще завантажуємо дані сім'ї. Перший раз це може тривати довше — перевірте інтернет (Wi-Fi) і трохи зачекайте.</p><button class="btn ghost" data-a="forget-device">Скасувати й почати спочатку</button></div></div>`
+      : `<div class="center-screen"><div class="loader"><i class="coin"></i></div><p class="hint">${esc(S.loadMsg || 'Завантажуємо дані…')}</p></div>`;
     return;
   }
   if (!S.data.rawSettings) {
