@@ -97,7 +97,9 @@ export function confetti(n = 60) {
   const items = ['🪙', '⭐', '💖', '🎀', '✨', '🪙', '💜'];
   for (let i = 0; i < n; i++) {
     const s = document.createElement('span');
-    s.textContent = items[i % items.length];
+    // 🪙 на новому iOS — сріблястий кружок; беремо власну золоту монетку зі зіркою
+    const it = items[i % items.length];
+    if (it === '🪙') s.innerHTML = '<i class="coin"></i>'; else s.textContent = it;
     s.style.left = Math.random() * 100 + 'vw';
     s.style.animationDelay = Math.random() * 0.8 + 's';
     s.style.animationDuration = 1.8 + Math.random() * 1.4 + 's';
