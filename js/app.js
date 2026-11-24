@@ -830,7 +830,9 @@ function moneyModal(kind) {
 // ---------- СВЯТКУВАННЯ ----------
 function checkCelebrate() {
   if (!S.data?.ready || !S.data.settings || isParentView() || S.device?.role !== 'child') return;
-  const earns = S.data.ledger.filter(e => ['earn', 'bonus', 'match', 'hearts', 'heartbonus'].includes(e.type));
+  // «просто так» додані батьками монетки — запис adjust зі знаком «плюс» (мінус — зняття, його не святкуємо)
+  const isGift = e => e.type === 'adjust' && total(e.amounts) > 0;
+  const earns = S.data.ledger.filter(e => ['earn', 'bonus', 'match', 'hearts', 'heartbonus'].includes(e.type) || isGift(e));
   const dailies = S.data.completions.filter(c => c.status === 'approved' && isDaily(c, S.data.tasks));
   const maxTs = Math.max(0, ...earns.map(e => e.ts || 0), ...dailies.map(c => c.decidedAt || 0));
   const stick = stickers().count;
@@ -844,7 +846,8 @@ function checkCelebrate() {
   const sum = fresh.reduce((a, e) => a + total(e.amounts), 0);
   const s = st(), th = theme(s.theme), h = hearts(S.data);
   const n = freshH.length + fresh.filter(e => e.type === 'heartbonus').reduce((a, e) => a + (e.hearts || 0), 0);
-  const wow = isF() ? 'Молодчинка' : 'Молодець';
+  const giftOnly = fresh.length > 0 && !freshH.length && fresh.every(isGift);
+  const wow = giftOnly ? 'Тобі подарунок' : isF() ? 'Молодчинка' : 'Молодець';
   const items = [...freshH.map(c => `❤️ ${esc(c.title)}`),
     ...fresh.filter(e => e.type !== 'earn' || !freshH.some(c => c.id === e.ref)).map(e => e.type === 'heartbonus' ? `🔥 ${esc(e.note)} +${e.hearts}❤️` : `${esc(e.icon)} ${esc(e.note)}`)];
   setTimeout(() => {
@@ -853,7 +856,7 @@ function checkCelebrate() {
         : `<div class="cele-hero"><div class="cele-glow"></div>${th.full[0]}<i class="cele-coin">${sum ? coinIcon() : '❤️'}</i></div>`}
       <div class="cele-amt">${sum ? `+${num(fromK(sum, s))} ${coinIcon()}` : `+${n} ❤️`}</div>
       <div class="cele-txt">${wow}!</div>
-      <div class="cele-friend">${esc(friendName(companion(s.theme), s))} радіє разом з тобою</div>
+      <div class="cele-friend">${giftOnly ? 'Батьки додали тобі монетки' : `${esc(friendName(companion(s.theme), s))} радіє разом з тобою`}</div>
       ${n ? `<div class="cele-hearts">${heartsBar()}</div>` : ''}
       ${newSticker ? `<div class="cele-sticker"><img src="${newSticker.img}" alt="">Нова наліпка!</div>` : ''}
       <div class="cele-list">${items.map(x => `<span>${x}</span>`).join('')}</div>
@@ -863,6 +866,7 @@ function checkCelebrate() {
     const coinsN = fromK(sum, s);
     const coinKey = s.currency === 'coins' && Number.isInteger(coinsN) && coinsN >= 1 && coinsN <= 10 ? `cele_coins_${coinsN}` : 'cele_coins_many';
     const heartKey = n >= 1 && n <= 4 ? `cele_hearts_${n}` : 'cele_hearts_many';
+    if (giftOnly) return sayF([], 'Ого! Тобі подарунок!');
     sayF(sum ? [coinKey, newSticker && 'sticker_new'] : [heartKey, left >= 1 && left <= 5 && `hearts_left_${left}`, newSticker && 'sticker_new'],
       (sum ? `Ура! ${wow}! Плюс монетки!` : `${wow}! Плюс сердечко!`) + (newSticker ? ' І нова наліпка!' : ''));
   }, 300);
