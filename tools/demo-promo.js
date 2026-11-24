@@ -34,36 +34,46 @@ if (!localStorage.getItem('mm.data.local')) {
   localStorage.setItem('mm.stickers', '99');
 }
 
-// Сценарій запису: застосунок сам проходить екрани, дотики показуються колами. Час — від завантаження сторінки.
+// Сценарій запису (довгий, ~50 с): справи → PIN → підтвердження → святкування → мрія-пазл → друзі за віком → наліпки → подарунок.
+// Час — від завантаження сторінки. Дотики показуються колами.
 if (!sessionStorage.getItem('tour')) {
   sessionStorage.setItem('tour', '1');
   localStorage.setItem('mm.celebrated', String(Date.now()));
-  const $ = s => document.querySelector(s);
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const style = document.createElement('style');
   style.textContent = '.tap-dot{position:fixed;z-index:99999;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 3px rgba(0,0,0,.18);pointer-events:none;animation:tapdot .55s ease-out forwards}@keyframes tapdot{from{transform:scale(.4);opacity:1}to{transform:scale(1.25);opacity:0}}';
   document.head.appendChild(style);
-  const tap = el => {
-    if (!el) return;
+  const dot = el => {
     const r = el.getBoundingClientRect(), d = document.createElement('div');
     d.className = 'tap-dot'; d.style.left = (r.left + r.width / 2) + 'px'; d.style.top = (r.top + r.height / 2) + 'px';
     document.body.appendChild(d); setTimeout(() => d.remove(), 700);
-    setTimeout(() => el.click(), 120);
   };
-  const task = text => [...document.querySelectorAll('.task')].find(t => t.textContent.includes(text));
-  const k = 'mm.data.local';
+  const tap = el => { if (!el) return; dot(el); setTimeout(() => el.click(), 120); };
+  const task = text => $$('.task').find(t => t.textContent.includes(text));
+  const k = 'mm.data.local', read = () => JSON.parse(localStorage.getItem(k));
+  const write = d => { localStorage.setItem(k, JSON.stringify(d)); window.dispatchEvent(new StorageEvent('storage', { key: k })); };
+  const key = n => tap($(`.pinpad [data-k="${n}"]`));
   const steps = [
-    [3.0, () => tap(task('покупки'))],
-    [5.2, () => tap($('.done-btn'))],
-    [7.4, () => { // «мама підтвердила»: монетки лягають у скарбнички
-      const d = JSON.parse(localStorage.getItem(k)), id = Object.keys(d.tasks).find(i => d.tasks[i].title.includes('покупки'));
-      Object.keys(d.completions).forEach(c => { if (d.completions[c].taskId === id && d.completions[c].status === 'pending') d.completions[c].status = 'approved'; });
-      d.ledger.promo1 = { ts: Date.now(), type: 'earn', amounts: { spend: 1000, save: 800, give: 200 }, note: 'Допомогти розкласти покупки', icon: '🛒', ref: id + '_' + new Date().toISOString().slice(0, 10) };
-      localStorage.setItem(k, JSON.stringify(d)); window.dispatchEvent(new StorageEvent('storage', { key: k })); }],
-    [11.2, () => { document.querySelectorAll('.confetti').forEach(c => c.remove()); tap($('.cele')); }],
-    [12.2, () => tap($('[data-a="kid-view"][data-v="dreams"]'))],
-    [15.4, () => tap($('[data-a="kid-view"][data-v="progress"]'))],
-    [18.6, () => tap($('[data-a="pick-companion"]'))],
-    [22.2, () => tap($('.modal-card .x'))],
+    [0.9, () => tap($('[data-a="kid-view"][data-v="dreams"]'))],
+    [2.9, () => tap($('[data-a="kid-view"][data-v="tasks"]'))],
+    [3.9, () => tap(task('тарілку'))],
+    [5.5, () => tap($('.done-btn'))],
+    [7.4, () => tap(task('покупки'))],
+    [9.1, () => tap($('.done-btn'))],
+    [11.0, () => { const l = $('[data-hold="unlock"]'); dot(l); l.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); }],
+    [13.0, () => key(1)], [13.5, () => key(2)], [14.0, () => key(3)], [14.5, () => key(4)],
+    [16.5, () => tap($('[data-a="approve-all"]'))],
+    [19.0, () => tap($('[data-a="ptab"][data-v="jars"]'))],
+    [21.4, () => tap($('[data-a="ptab"][data-v="report"]'))],
+    [23.8, () => tap($('[data-a="ptab"][data-v="settings"]'))],
+    [25.0, () => { const g = $('.comp-ages'); if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' }); }],
+    [26.8, () => tap($('input[name="gridAge"][value="6-7"]')?.closest('label'))],
+    [28.6, () => tap($('input[name="gridAge"][value="8-10"]')?.closest('label'))],
+    [31.0, () => { window.scrollTo({ top: 0, behavior: 'instant' }); tap($('[data-a="lock"]')); }],
+    [37.0, () => { $$('.confetti').forEach(c => c.remove()); tap($('.cele')); }],
+    [38.2, () => tap($('[data-a="kid-view"][data-v="dreams"]'))],
+    [43.6, () => tap($('[data-a="kid-view"][data-v="progress"]'))],
+    [47.0, () => { const d = read(); d.ledger.promoGift = { ts: Date.now(), type: 'adjust', amounts: { spend: 3000, save: 0, give: 0 }, note: 'Допомогла бабусі', icon: '🎁' }; write(d); }],
   ];
   steps.forEach(([t, f]) => setTimeout(f, t * 1000));
 }
